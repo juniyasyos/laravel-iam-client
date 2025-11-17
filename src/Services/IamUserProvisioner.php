@@ -7,7 +7,6 @@ use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
-use App\Http\Controllers\Auth\CustomSessionGuard;
 
 class IamUserProvisioner
 {
@@ -21,7 +20,7 @@ class IamUserProvisioner
     public function provisionFromToken(string $accessToken)
     {
         $secret = config('iam.jwt_secret');
-        $guard = config('iam.guard', 'web');
+        $guardName = config('iam.guard', 'web');
         $userModel = config('iam.user_model');
 
         // 1. Decode and verify JWT
@@ -54,59 +53,60 @@ class IamUserProvisioner
             abort(403, 'Token not valid for this application.');
         }
 
-        // 4. Extract user data from payload
-        $iamId = $payload['sub'] ?? null;
-        if (!$iamId) {
-            abort(403, 'Token missing user identifier (sub).');
+        // 4. Build user data from configured field mapping
+        $userFields = config('iam.user_fields', [
+            'iam_id' => 'sub',
+            'name' => 'name',
+            'email' => 'email',
+        ]);
+
+        $identifierField = config('iam.identifier_field', 'iam_id');
+        $identifierJwtField = $userFields[$identifierField] ?? 'sub';
+        $identifierValue = $payload[$identifierJwtField] ?? null;
+
+        if (!$identifierValue) {
+            abort(403, "Token missing required identifier field: {$identifierJwtField}");
         }
 
-        $name = $payload['name'] ?? 'User';
-        $email = $payload['email'] ?? null;
+        // Build user data array from field mapping
+        $userData = [];
+        foreach ($userFields as $dbColumn => $jwtField) {
+            if ($dbColumn === $identifierField) {
+                continue; // Skip identifier, used separately
+            }
+            if (isset($payload[$jwtField])) {
+                $userData[$dbColumn] = $payload[$jwtField];
+            }
+        }
+
+        // Add active flag
+        $userData['active'] = true;
 
         Log::info('IAM user provisioning started', [
-            'iam_id' => $iamId,
-            'name' => $name,
-            'email' => $email,
+            'identifier_field' => $identifierField,
+            'identifier_value' => $identifierValue,
+            'user_data' => $userData,
         ]);
 
         // 5. JIT Provisioning: updateOrCreate user
         /** @var \Illuminate\Database\Eloquent\Model $user */
         $user = $userModel::updateOrCreate(
-            ['iam_id' => $iamId],
-            [
-                'name' => $name,
-                'email' => $email,
-                'active' => true,
-            ]
+            [$identifierField => $identifierValue],
+            $userData
         );
 
         Log::info('IAM user provisioned', [
             'user_id' => $user->id,
-            'iam_id' => $iamId,
             'created' => $user->wasRecentlyCreated,
         ]);
 
         // 6. Sync roles from token payload
-        $this->syncRoles($user, $payload);
-
-        // 7. Login user to the application (without regenerating session ID if using CustomSessionGuard)
-        $guard = Auth::guard($guard);
-
-        if ($guard instanceof CustomSessionGuard) {
-            // Use custom login that preserves session ID (important for IAM)
-            $guard->loginWithoutRegeneration($user);
-            Log::info('IAM user logged in via CustomSessionGuard (session preserved)', [
-                'user_id' => $user->id,
-                'guard' => config('iam.guard', 'web'),
-            ]);
-        } else {
-            // Fallback to standard login
-            Auth::guard(config('iam.guard', 'web'))->login($user);
-            Log::info('IAM user logged in via standard guard', [
-                'user_id' => $user->id,
-                'guard' => config('iam.guard', 'web'),
-            ]);
+        if (config('iam.sync_roles', true)) {
+            $this->syncRoles($user, $payload);
         }
+
+        // 7. Login user with session preservation option
+        $this->loginUser($user, $guardName);
 
         // 8. Store access token in session if configured
         if (config('iam.store_access_token_in_session', true)) {
@@ -114,6 +114,46 @@ class IamUserProvisioner
         }
 
         return $user;
+    }
+
+    /**
+     * Login user with optional session ID preservation
+     *
+     * @param \Illuminate\Database\Eloquent\Model $user
+     * @param string $guardName
+     * @return void
+     */
+    protected function loginUser($user, string $guardName): void
+    {
+        $preserveSession = config('iam.preserve_session_id', true);
+        $guard = Auth::guard($guardName);
+
+        if ($preserveSession) {
+            // Preserve session ID (no regeneration)
+            $sessionId = session()->getId();
+
+            // Manually update session without regeneration
+            session()->put(Auth::getName(), $user->getAuthIdentifier());
+            $guard->setUser($user);
+
+            // Fire login event
+            event(new \Illuminate\Auth\Events\Login($guardName, $user, false));
+
+            Log::info('IAM user logged in (session preserved)', [
+                'user_id' => $user->id,
+                'guard' => $guardName,
+                'session_id_before' => $sessionId,
+                'session_id_after' => session()->getId(),
+            ]);
+        } else {
+            // Standard login with session regeneration
+            $guard->login($user);
+
+            Log::info('IAM user logged in (standard)', [
+                'user_id' => $user->id,
+                'guard' => $guardName,
+            ]);
+        }
     }
 
     /**
