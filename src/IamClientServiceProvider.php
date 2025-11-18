@@ -29,6 +29,9 @@ class IamClientServiceProvider extends ServiceProvider
         // Load migrations
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
+        // Load views
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'iam-client');
+
         // Publish config
         $this->publishes([
             __DIR__ . '/../config/iam.php' => config_path('iam.php'),
@@ -38,5 +41,14 @@ class IamClientServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../database/migrations/' => database_path('migrations'),
         ], 'iam-migrations');
+
+        // Publish views
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/iam-client'),
+        ], 'iam-views');
+
+        // Register middleware alias
+        $router = $this->app['router'];
+        $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);
     }
 }

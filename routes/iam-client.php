@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Juniyasyos\IamClient\Http\Controllers\SsoLoginRedirectController;
 use Juniyasyos\IamClient\Http\Controllers\SsoCallbackController;
+use Juniyasyos\IamClient\Http\Controllers\LogoutController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,4 +22,8 @@ Route::middleware('web')->group(function () {
     // Handle callback from IAM after successful authentication
     Route::match(['GET', 'POST'], config('iam.callback_route', '/sso/callback'), SsoCallbackController::class)
         ->name('iam.sso.callback');
+
+    // Logout
+    Route::post('/logout', LogoutController::class)
+        ->name('iam.logout');
 });

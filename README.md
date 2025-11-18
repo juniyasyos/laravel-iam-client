@@ -20,6 +20,11 @@ composer require juniyasyos/laravel-iam-client
 php artisan migrate
 ```
 
+### Publish Configuration
+
+```bash
+php artisan vendor:publish --tag=iam-config
+```
 ## Quick Start
 
 ### 1. Environment Variables

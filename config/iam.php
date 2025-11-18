@@ -117,7 +117,7 @@ return [
     | Usually 'iam_id' or 'email'
     |
     */
-    'identifier_field' => env('IAM_IDENTIFIER_FIELD', 'iam_id'),
+    'identifier_field' => env('IAM_IDENTIFIER_FIELD', 'email'),
 
     /*
     |--------------------------------------------------------------------------
@@ -140,5 +140,25 @@ return [
     |
     */
     'store_access_token_in_session' => env('IAM_STORE_TOKEN_IN_SESSION', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout Route Name
+    |--------------------------------------------------------------------------
+    |
+    | The route name to redirect after logout.
+    |
+    */
+    'logout_redirect_route' => env('IAM_LOGOUT_REDIRECT', 'home'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login Route Name  
+    |--------------------------------------------------------------------------
+    |
+    | The route name for login page (used for unauthenticated redirects).
+    |
+    */
+    'login_route_name' => env('IAM_LOGIN_ROUTE_NAME', 'login'),
 
 ];
