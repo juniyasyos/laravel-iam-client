@@ -36,7 +36,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | SSO Routes
+    | Token Verification Endpoint
+    |--------------------------------------------------------------------------
+    |
+    | Optional explicit endpoint for JWT verification. When null, the package
+    | will derive it from the IAM base URL.
+    |
+    */
+    'verify_endpoint' => env('IAM_VERIFY_ENDPOINT'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Web Guard SSO Routes
     |--------------------------------------------------------------------------
     |
     | Configure the routes for SSO login and callback endpoints.
@@ -160,5 +171,49 @@ return [
     |
     */
     'login_route_name' => env('IAM_LOGIN_ROUTE_NAME', 'login'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Guard Specific Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Allows overriding guard, redirect, and Filament specific settings per
+    | guard. Values fall back to the legacy keys above for backwards
+    | compatibility.
+    |
+    */
+    'guards' => [
+        'web' => [
+            'guard' => env('IAM_GUARD', 'web'),
+            'redirect_route' => env('IAM_DEFAULT_REDIRECT', '/'),
+            'login_route_name' => env('IAM_LOGIN_ROUTE_NAME', 'login'),
+            'logout_redirect_route' => env('IAM_LOGOUT_REDIRECT', 'home'),
+        ],
+        'filament' => [
+            'guard' => env('IAM_FILAMENT_GUARD', 'filament'),
+            'redirect_route' => env('IAM_FILAMENT_REDIRECT_ROUTE', null),
+            'login_route_name' => env('IAM_FILAMENT_LOGIN_ROUTE_NAME', 'filament.auth.login'),
+            'logout_redirect_route' => env('IAM_FILAMENT_LOGOUT_REDIRECT', null),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Filament Integration
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, additional routes, hooks, and UI helpers for Filament will
+    | be registered. Disable to keep the package framework agnostic.
+    |
+    */
+    'filament' => [
+        'enabled' => env('IAM_FILAMENT_ENABLED', false),
+        'panel' => env('IAM_FILAMENT_PANEL', 'admin'),
+        'login_route' => env('IAM_FILAMENT_LOGIN_ROUTE', '/filament/sso/login'),
+        'callback_route' => env('IAM_FILAMENT_CALLBACK_ROUTE', '/filament/sso/callback'),
+        'login_button_text' => env('IAM_FILAMENT_LOGIN_BUTTON', 'Login via IAM'),
+        'logout_route' => env('IAM_FILAMENT_LOGOUT_ROUTE'),
+        'middleware' => ['web'],
+    ],
 
 ];

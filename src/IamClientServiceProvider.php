@@ -3,6 +3,7 @@
 namespace Juniyasyos\IamClient;
 
 use Illuminate\Support\ServiceProvider;
+use Juniyasyos\IamClient\Support\FilamentIntegration;
 
 class IamClientServiceProvider extends ServiceProvider
 {
@@ -12,10 +13,11 @@ class IamClientServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Merge package config with application config
-        $this->mergeConfigFrom(
-            __DIR__ . '/../config/iam.php',
-            'iam'
-        );
+        $configPath = __DIR__ . '/../config/iam.php';
+
+        if (file_exists($configPath)) {
+            $this->mergeConfigFrom($configPath, 'iam');
+        }
     }
 
     /**
@@ -50,5 +52,7 @@ class IamClientServiceProvider extends ServiceProvider
         // Register middleware alias
         $router = $this->app['router'];
         $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);
+
+        FilamentIntegration::boot();
     }
 }

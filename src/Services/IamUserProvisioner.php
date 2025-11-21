@@ -2,10 +2,12 @@
 
 namespace Juniyasyos\IamClient\Services;
 
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Juniyasyos\IamClient\Exceptions\IamAuthenticationException;
+use Juniyasyos\IamClient\Support\IamConfig;
 
 class IamUserProvisioner
 {
@@ -13,8 +15,9 @@ class IamUserProvisioner
      * Provision user from IAM token using HTTP verification.
      *
      * @param string $token Token from IAM
-     * @return \Illuminate\Database\Eloquent\Model
-     * @throws \Exception
+     * @return array{0: \Illuminate\Contracts\Auth\Authenticatable, 1: array}
+     *
+     * @throws IamAuthenticationException
      */
     public function provisionFromToken(string $token)
     {
@@ -23,10 +26,11 @@ class IamUserProvisioner
             'session_id' => session()->getId(),
         ]);
 
-        abort_if(! $token, 400, 'Missing token');
+        if (! $token) {
+            throw new IamAuthenticationException('Missing token');
+        }
 
-        $verifyEndpoint = config('services.iam.verify');
-        abort_if(! $verifyEndpoint, 500, 'IAM verify endpoint is not configured');
+        $verifyEndpoint = IamConfig::verifyEndpoint();
 
         try {
             $response = Http::timeout(10)->asJson()->post($verifyEndpoint, ['token' => $token]);
@@ -37,7 +41,10 @@ class IamUserProvisioner
                 'error' => $e->getMessage(),
             ]);
 
-            throw new \Exception('Authentication server temporarily unavailable. Please try again.');
+            throw new IamAuthenticationException(
+                'Authentication server temporarily unavailable. Please try again.',
+                ['endpoint' => $verifyEndpoint]
+            );
         }
 
         if (! $response->ok()) {
@@ -46,36 +53,82 @@ class IamUserProvisioner
                 'body' => $response->body(),
             ]);
 
-            throw new \Exception('SSO token invalid/expired');
+            throw new IamAuthenticationException('SSO token invalid/expired', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
         }
 
-        $payload = $response->json();
-        abort_unless(isset($payload['email']) && is_string($payload['email']), 422, 'Missing user email');
+        $payload = $response->json() ?? [];
 
-        $userModel = config('iam.user_model', 'App\\Models\\User');
-        $user = $userModel::query()->updateOrCreate(
-            ['email' => $payload['email']],
-            [
-                'name' => $payload['name'] ?? $payload['email'],
-                'password' => Str::password(32),
-            ],
-        );
+        $user = $this->syncUser($payload);
+        $this->syncRoles($user, $payload);
 
         Log::info('User provisioned', [
-            'user_id' => $user->id,
-            'email' => $user->email,
+            'user_id' => $user->getAuthIdentifier(),
+            'email' => $user->email ?? null,
         ]);
 
-        // Store IAM session data
-        session([
-            'iam' => [
-                'sub' => $payload['sub'] ?? null,
-                'app' => $payload['app'] ?? null,
-                'roles' => $payload['roles'] ?? [],
-                'perms' => $payload['perms'] ?? [],
-            ],
-        ]);
+        return [$user, $payload];
+    }
 
-        return $user;
+    protected function syncUser(array $payload): Model
+    {
+        $fields = config('iam.user_fields', []);
+        $identifierField = config('iam.identifier_field', 'email');
+
+        $attributes = [];
+
+        foreach ($fields as $column => $claim) {
+            $value = data_get($payload, $claim);
+
+            if ($value !== null) {
+                $attributes[$column] = $value;
+            }
+        }
+
+        if (! array_key_exists($identifierField, $attributes)) {
+            throw new IamAuthenticationException(
+                sprintf('Missing identifier field [%s] from IAM payload.', $identifierField)
+            );
+        }
+
+        if (! array_key_exists('password', $attributes)) {
+            $attributes['password'] = Str::password(32);
+        }
+
+        $userModel = config('iam.user_model', 'App\\Models\\User');
+
+        return $userModel::query()->updateOrCreate(
+            [$identifierField => $attributes[$identifierField]],
+            $attributes,
+        );
+    }
+
+    protected function syncRoles(Model $user, array $payload): void
+    {
+        if (! config('iam.sync_roles', true)) {
+            return;
+        }
+
+        if (! method_exists($user, 'syncRoles')) {
+            Log::debug('IAM role sync skipped because syncRoles() is missing on the user model.');
+
+            return;
+        }
+
+        $roles = array_filter(array_map(function ($role) {
+            if (is_array($role)) {
+                return $role['slug'] ?? $role['name'] ?? null;
+            }
+
+            return is_string($role) ? $role : null;
+        }, $payload['roles'] ?? []));
+
+        if (empty($roles)) {
+            return;
+        }
+
+        $user->syncRoles($roles);
     }
 }

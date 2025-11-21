@@ -137,9 +137,15 @@
 
                 const tokenInput = document.createElement('input');
                 tokenInput.type = 'hidden';
-                tokenInput.name = 'access_token';
+                tokenInput.name = 'token';
                 tokenInput.value = accessToken;
                 form.appendChild(tokenInput);
+
+                const legacyInput = document.createElement('input');
+                legacyInput.type = 'hidden';
+                legacyInput.name = 'access_token';
+                legacyInput.value = accessToken;
+                form.appendChild(legacyInput);
 
                 const csrfInput = document.createElement('input');
                 csrfInput.type = 'hidden';

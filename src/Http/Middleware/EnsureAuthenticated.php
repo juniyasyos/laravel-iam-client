@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Juniyasyos\IamClient\Support\IamConfig;
 
 class EnsureAuthenticated
 {
@@ -16,7 +17,7 @@ class EnsureAuthenticated
      * @param  \Closure  $next
      * @return mixed
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next, string $guard = 'web')
     {
         // Force session start if not started
         if (!session()->isStarted()) {
@@ -24,28 +25,32 @@ class EnsureAuthenticated
         }
 
         $sessionId = session()->getId();
+        $guardName = IamConfig::guardName($guard);
+        $guardInstance = Auth::guard($guardName);
 
-        if (!Auth::check()) {
+        if (! $guardInstance->check()) {
             Log::info('IAM auth middleware: User not authenticated', [
                 'path' => $request->path(),
                 'session_id' => $sessionId,
                 'session_started' => session()->isStarted(),
+                'guard' => $guardName,
             ]);
 
             // Store intended URL
             session(['url.intended' => $request->fullUrl()]);
 
             // Get login route from config
-            $loginRoute = config('iam.login_route_name', 'login');
+            $loginRoute = IamConfig::loginRouteName($guard);
 
             return redirect()->route($loginRoute)
                 ->with('warning', 'Please login to continue.');
         }
 
         Log::debug('IAM auth middleware: User authenticated', [
-            'user_id' => Auth::id(),
+            'user_id' => $guardInstance->id(),
             'path' => $request->path(),
             'session_id' => $sessionId,
+            'guard' => $guardName,
         ]);
 
         return $next($request);

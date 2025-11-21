@@ -19,6 +19,12 @@ packages/juniyasyos/laravel-iam-client/
 ├── routes/
 │   └── iam-client.php       # SSO routes (login & callback)
 │
+├── resources/
+│   └── views/
+│       ├── callback-handler.blade.php
+│       └── components/
+│           └── filament-login-button.blade.php
+│
 └── src/
     ├── IamClientServiceProvider.php    # Main service provider
     │
@@ -27,8 +33,19 @@ packages/juniyasyos/laravel-iam-client/
     │       ├── SsoLoginRedirectController.php   # Redirect to IAM
     │       └── SsoCallbackController.php        # Handle IAM callback
     │
-    └── Services/
-        └── IamUserProvisioner.php      # JIT provisioning service
+    ├── Services/
+    │   ├── IamClientManager.php        # Guard-aware login orchestration
+    │   └── IamUserProvisioner.php      # JIT provisioning service
+    │
+    ├── Support/
+    │   ├── FilamentIntegration.php     # Optional Filament hooks
+    │   └── IamConfig.php               # Helper untuk membaca config per guard
+    │
+    ├── Data/
+    │   └── IamLoginResult.php          # DTO hasil autentikasi
+    │
+    └── Events/
+        └── IamAuthenticated.php        # Event saat login sukses
 ```
 
 ## Key Files Description
@@ -66,19 +83,13 @@ Controller untuk redirect user ke IAM login page dengan:
 
 ### SsoCallbackController
 Controller untuk handle callback dari IAM:
-- Receive access token
-- Provision user via IamUserProvisioner
-- Login user
-- Redirect to intended URL
+- Terima token dari IAM (query atau fragment)
+- Serahkan ke IamClientManager untuk verifikasi & login
+- Redirect ke URL yang diinginkan/guard terkait
 
-### IamUserProvisioner
-Service untuk JIT provisioning:
-1. Decode & verify JWT token
-2. Validate token claims (type, app_key, expiry)
-3. Create/update local user
-4. Sync roles from token to Spatie Permission
-5. Login user to application
-6. Store token in session
+### IamUserProvisioner & IamClientManager
+- **IamUserProvisioner**: verifikasi token via endpoint HTTP, mapping payload ke kolom user, serta sinkronisasi role.
+- **IamClientManager**: pilih guard, login user, simpan data IAM di session, dan broadcast event `IamAuthenticated`.
 
 ## Published Files
 
