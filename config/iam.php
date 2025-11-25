@@ -43,7 +43,7 @@ return [
     | will derive it from the IAM base URL.
     |
     */
-    'verify_endpoint' => env('IAM_VERIFY_ENDPOINT'),
+    'verify_endpoint' => env('IAM_VERIFY_ENDPOINT', 'http://localhost:8000/api/sso/verify'),
 
     /*
     |--------------------------------------------------------------------------
