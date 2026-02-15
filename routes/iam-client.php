@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Juniyasyos\IamClient\Http\Controllers\SsoLoginRedirectController;
 use Juniyasyos\IamClient\Http\Controllers\SsoCallbackController;
 use Juniyasyos\IamClient\Http\Controllers\LogoutController;
+use Juniyasyos\IamClient\Http\Controllers\SyncRolesController;
 use Juniyasyos\IamClient\Support\IamConfig;
 
 /*
@@ -14,6 +15,12 @@ use Juniyasyos\IamClient\Support\IamConfig;
 | These routes handle SSO login flow with IAM server.
 |
 */
+
+// API endpoint for IAM role synchronization
+Route::middleware('api')->group(function () {
+    Route::get('/api/iam/sync-roles', SyncRolesController::class)
+        ->name('iam.sync-roles');
+});
 
 Route::middleware('web')->group(function () {
     // Redirect to IAM login page
