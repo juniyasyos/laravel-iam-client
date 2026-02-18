@@ -7,6 +7,8 @@ Package Laravel untuk integrasi Single Sign-On (SSO) dengan IAM server menggunak
 - ✅ **Zero Configuration** – Minimal setup, langsung pakai
 - ✅ **Guard-aware SSO Routes** – Jalankan beberapa guard sekaligus (web/Filament/dsb)
 - ✅ **OP‑initiated logout (`/iam/logout`)** – Public endpoint tersedia; IAM dapat mengarahkan browser ke `/iam/logout` (mendukung `post_logout_redirect`).
+
+  Configuration: `logout_on_op_initiated` (default: `true`) — when enabled the plugin will perform a full `auth()->logout()` and invalidate the session when receiving an OP‑initiated logout. Set to `false` to preserve the legacy behaviour of only clearing IAM-related session keys.
 - ✅ **JIT User Provisioning** – User otomatis dibuat/update sesuai mapping
 - ✅ **JWT Token Verification** – Validasi token via endpoint IAM
 - ✅ **Role Synchronization** – Sinkronisasi role ke Spatie Permission (opsional)

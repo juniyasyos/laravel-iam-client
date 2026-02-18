@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Juniyasyos\IamClient\Support\IamConfig;
+use Illuminate\Support\Facades\Auth;
 
 class IamInitiatedLogoutController extends Controller
 {
@@ -15,25 +16,45 @@ class IamInitiatedLogoutController extends Controller
      */
     public function __invoke(Request $request, string $guard = 'web')
     {
+        $currentUserId = auth()->id();
+
         Log::info('OP‑initiated logout received', [
             'session_id' => session()->getId(),
             'guard' => $guard,
             'auth_checked' => auth()->check(),
-            'auth_user_id' => auth()->id(),
+            'auth_user_id' => $currentUserId,
             'request_id' => $request->query('request_id') ?? $request->header('X-IAM-Request-Id'),
         ]);
 
-        // Only remove IAM-related session keys (non‑destructive for app auth)
-        session()->forget([
-            'iam_access_token',
-            'iam_refresh_token',
-            'iam_expires_at',
-            'iam_user',
-            'iam',
-        ]);
+        // Configurable behaviour: perform full logout on OP‑initiated
+        $logoutOnOp = (bool) config('iam.logout_on_op_initiated', true);
 
-        // Regenerate CSRF token to reduce fixation risk
-        $request->session()->regenerateToken();
+        if ($logoutOnOp) {
+            $guardName = IamConfig::guardName($guard);
+
+            // Full application logout (invalidate session + regenerate token)
+            Auth::guard($guardName)->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            Log::info('OP‑initiated logout: full_logout_performed', [
+                'guard' => $guardName,
+                'previous_user_id' => $currentUserId,
+                'request_id' => $request->query('request_id') ?? $request->header('X-IAM-Request-Id'),
+            ]);
+        } else {
+            // Backward-compatible: only remove IAM-related session keys (non‑destructive)
+            session()->forget([
+                'iam_access_token',
+                'iam_refresh_token',
+                'iam_expires_at',
+                'iam_user',
+                'iam',
+            ]);
+
+            // Regenerate CSRF token to reduce fixation risk
+            $request->session()->regenerateToken();
+        }
 
         // Allow OP to pass `post_logout_redirect` so IAM can continue the
         // logout chain. Only accept redirects back to IAM (`IamConfig::baseUrl()`).

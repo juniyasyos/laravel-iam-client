@@ -174,8 +174,19 @@ return [
     'logout_redirect_route' => env('IAM_LOGOUT_REDIRECT', 'home'),
 
     /*
-    |--------------------------------------------------------------------------
-    | Login Route Name  
+    |--------------------------------------------------------------------------    | OP‑initiated logout behaviour
+    --------------------------------------------------------------------------
+    |
+    | Controls how the client responds to OP‑initiated (front‑channel) logout
+    | requests from the IAM server (`GET /iam/logout`). When true the client
+    | will perform a full `auth()->logout()` + session invalidation. If false
+    | the plugin will only remove IAM-related session keys (legacy behaviour).
+    |
+    */
+    'logout_on_op_initiated' => env('IAM_LOGOUT_ON_OP_INITIATED', true),
+
+    /*
+    --------------------------------------------------------------------------    | Login Route Name  
     |--------------------------------------------------------------------------
     |
     | The route name for login page (used for unauthenticated redirects).
