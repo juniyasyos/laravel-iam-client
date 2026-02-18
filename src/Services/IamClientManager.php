@@ -24,6 +24,26 @@ class IamClientManager
         $guardName = IamConfig::guardName($guard);
         $guardInstance = $this->guard($guardName);
 
+        // Jika ada sesi lokal berbeda, ganti dengan user dari token SSO (opsi konfigurasi)
+        if (config('iam.replace_session_on_callback', true) && $guardInstance->check()) {
+            $identifier = config('iam.identifier_field', 'email');
+            $currentUser = $guardInstance->user();
+            $currentValue = data_get($currentUser, $identifier);
+            $incomingValue = data_get($user, $identifier);
+
+            if ($currentValue && $incomingValue && $currentValue !== $incomingValue) {
+                Log::info('Replacing existing session with SSO user', [
+                    'current_identifier' => $currentValue,
+                    'incoming_identifier' => $incomingValue,
+                    'guard' => $guardName,
+                    'session_id' => session()->getId(),
+                ]);
+
+                $guardInstance->logout();
+                session()->invalidate();
+            }
+        }
+
         if (! config('iam.preserve_session_id', true)) {
             session()->regenerate();
         }

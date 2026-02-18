@@ -99,6 +99,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Replace session on SSO callback
+    |--------------------------------------------------------------------------
+    |
+    | When true, an existing local session will be invalidated and replaced
+    | with the SSO user if the incoming token represents a different user.
+    |
+    */
+    'replace_session_on_callback' => env('IAM_REPLACE_SESSION_ON_CALLBACK', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | User Field Mapping
     |--------------------------------------------------------------------------
     |
