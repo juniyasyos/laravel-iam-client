@@ -18,9 +18,23 @@ class VerifyIamBackchannelSignature
         $body = $request->getContent() ?: '';
         $secret = config('sso.secret', env('SSO_SECRET', ''));
 
+        // Log verification attempt (do not log raw body or signature)
         if (empty($secret) || ! hash_equals(hash_hmac('sha256', $body, $secret), $signature)) {
+            \Illuminate\Support\Facades\Log::warning('iam.backchannel_signature_invalid', [
+                'header_present' => ! empty($signature),
+                'request_id' => $request->header('X-IAM-Request-Id'),
+                'ip' => $request->ip(),
+            ]);
+
             return response()->json(['message' => 'invalid signature'], 403);
         }
+
+        \Illuminate\Support\Facades\Log::info('iam.backchannel_signature_valid', [
+            'header' => $header,
+            'signature_present' => ! empty($signature),
+            'request_id' => $request->header('X-IAM-Request-Id'),
+            'ip' => $request->ip(),
+        ]);
 
         return $next($request);
     }

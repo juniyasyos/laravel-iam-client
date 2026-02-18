@@ -18,6 +18,9 @@ class IamInitiatedLogoutController extends Controller
         Log::info('OP‑initiated logout received', [
             'session_id' => session()->getId(),
             'guard' => $guard,
+            'auth_checked' => auth()->check(),
+            'auth_user_id' => auth()->id(),
+            'request_id' => $request->query('request_id') ?? $request->header('X-IAM-Request-Id'),
         ]);
 
         // Only remove IAM-related session keys (non‑destructive for app auth)
