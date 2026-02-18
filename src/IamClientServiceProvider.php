@@ -52,6 +52,7 @@ class IamClientServiceProvider extends ServiceProvider
         // Register middleware alias
         $router = $this->app['router'];
         $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);
+        $router->aliasMiddleware('iam.backchannel.verify', \Juniyasyos\IamClient\Http\Middleware\VerifyIamBackchannelSignature::class);
 
         FilamentIntegration::boot();
     }
