@@ -165,6 +165,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Verify token each request
+    |--------------------------------------------------------------------------
+    |
+    | When enabled the client will call the IAM `verify` endpoint on every
+    | web request to ensure the stored access token is still valid. If the
+    | token is invalid the client will clear the session and redirect to
+    | the login page.
+    |
+    */
+    'verify_each_request' => env('IAM_VERIFY_EACH_REQUEST', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Logout Route Name
     |--------------------------------------------------------------------------
     |

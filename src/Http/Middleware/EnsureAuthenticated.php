@@ -53,6 +53,47 @@ class EnsureAuthenticated
             'guard' => $guardName,
         ]);
 
+        // Optional: verify stored IAM access token with IAM on every request.
+        if (config('iam.verify_each_request', true)) {
+            $accessToken = session('iam.access_token');
+
+            if (! empty($accessToken)) {
+                try {
+                    $verifyEndpoint = IamConfig::verifyEndpoint();
+                    $resp = \Illuminate\Support\Facades\Http::timeout(3)->post($verifyEndpoint, ['token' => $accessToken]);
+
+                    if (! $resp->ok()) {
+                        Log::warning('IAM middleware: token introspection failed — clearing session', [
+                            'status' => $resp->status(),
+                            'session_id' => $sessionId,
+                        ]);
+
+                        Auth::guard($guardName)->logout();
+                        $request->session()->invalidate();
+                        $request->session()->regenerateToken();
+                        $request->session()->forget('iam');
+
+                        $loginRoute = IamConfig::loginRouteName($guard);
+
+                        return redirect()->route($loginRoute)->with('warning', 'Session expired, please login again.');
+                    }
+                } catch (\Exception $e) {
+                    Log::error('IAM middleware: token introspection request failed', [
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    Auth::guard($guardName)->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+                    $request->session()->forget('iam');
+
+                    $loginRoute = IamConfig::loginRouteName($guard);
+
+                    return redirect()->route($loginRoute)->with('warning', 'Authentication verification failed.');
+                }
+            }
+        }
+
         return $next($request);
     }
 }
