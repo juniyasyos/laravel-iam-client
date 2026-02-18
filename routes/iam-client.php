@@ -5,6 +5,7 @@ use Juniyasyos\IamClient\Http\Controllers\SsoLoginRedirectController;
 use Juniyasyos\IamClient\Http\Controllers\SsoCallbackController;
 use Juniyasyos\IamClient\Http\Controllers\LogoutController;
 use Juniyasyos\IamClient\Http\Controllers\SyncRolesController;
+use Juniyasyos\IamClient\Http\Controllers\IamInitiatedLogoutController;
 use Juniyasyos\IamClient\Support\IamConfig;
 
 /*
@@ -36,6 +37,12 @@ Route::middleware('web')->group(function () {
     // Logout
     Route::post('/logout', LogoutController::class)
         ->name('iam.logout')
+        ->defaults('guard', 'web');
+
+    // Public endpoint for OP‑initiated (global) logout called by IAM.
+    // Clears only IAM-related session keys so client can sign-out silently.
+    Route::get('/iam/logout', IamInitiatedLogoutController::class)
+        ->name('iam.iam.logout')
         ->defaults('guard', 'web');
 });
 
