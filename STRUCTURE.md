@@ -63,6 +63,12 @@ Configuration untuk:
 - User model dan guard settings
 - Role synchronization settings
 
+Role enforcement (new):
+- `require_roles`: bila diaktifkan, login SSO akan ditolak jika token tidak berisi roles.
+- `required_roles`: daftar role yang diperbolehkan (comma-separated via env atau array); token harus memiliki setidaknya satu role yang cocok.
+
+Gunakan setting ini bila aplikasi client perlu mencegah user tanpa role atau tanpa role yang sesuai untuk mengakses aplikasi.
+
 ### Migration: add_iam_columns_to_users_table
 Menambahkan kolom ke tabel users:
 - `iam_id`: Foreign key ke IAM user

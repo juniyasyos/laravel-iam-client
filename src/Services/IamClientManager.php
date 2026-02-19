@@ -13,9 +13,7 @@ use Juniyasyos\IamClient\Support\IamConfig;
 
 class IamClientManager
 {
-    public function __construct(private readonly IamUserProvisioner $provisioner)
-    {
-    }
+    public function __construct(private readonly IamUserProvisioner $provisioner) {}
 
     public function loginWithToken(string $token, string $guard = 'web'): IamLoginResult
     {
@@ -47,6 +45,39 @@ class IamClientManager
         if (! config('iam.preserve_session_id', true)) {
             session()->regenerate();
         }
+
+        // --- Role enforcement (optional, configurable) --------------------------------
+        $tokenRoles = array_filter(array_map(function ($r) {
+            if (is_array($r)) {
+                return $r['slug'] ?? $r['name'] ?? null;
+            }
+
+            return is_string($r) ? $r : null;
+        }, $payload['roles'] ?? []));
+
+        // If the application requires that tokens carry at least one role, reject otherwise
+        if (config('iam.require_roles', false) && empty($tokenRoles)) {
+            Log::warning('IAM callback rejected: token contains no roles but roles are required', [
+                'user_sub' => $payload['sub'] ?? null,
+                'app' => $payload['app'] ?? null,
+                'session_id' => session()->getId(),
+            ]);
+
+            throw new IamAuthenticationException('Access denied: no roles assigned in SSO token');
+        }
+
+        // If a whitelist of required roles is configured, ensure there is at least one match
+        $required = config('iam.required_roles', []);
+        if (! empty($required) && empty(array_intersect($required, $tokenRoles))) {
+            Log::warning('IAM callback rejected: token does not contain any of the required roles', [
+                'required_roles' => $required,
+                'token_roles' => $tokenRoles,
+                'user_sub' => $payload['sub'] ?? null,
+            ]);
+
+            throw new IamAuthenticationException('Access denied: insufficient roles');
+        }
+        // ------------------------------------------------------------------------------
 
         $guardInstance->login($user, true);
 

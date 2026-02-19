@@ -154,6 +154,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Role enforcement (optional)
+    |--------------------------------------------------------------------------
+    |
+    | - `require_roles` when true will reject SSO login if the token contains
+    |   no roles.
+    | - `required_roles` accepts a comma-separated list (via env) or an array
+    |   of role names; when non-empty the token must contain at least one of
+    |   these roles for login to succeed.
+    |
+    */
+    'require_roles' => env('IAM_REQUIRE_ROLES', false),
+    'required_roles' => env('IAM_REQUIRED_ROLES') ? array_map('trim', explode(',', env('IAM_REQUIRED_ROLES'))) : [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Store Access Token in Session
     |--------------------------------------------------------------------------
     |
