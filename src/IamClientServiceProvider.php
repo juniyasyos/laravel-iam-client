@@ -36,34 +36,39 @@ class IamClientServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Load routes
-        $this->loadRoutesFrom(__DIR__ . '/../routes/iam-client.php');
-
-        // Load migrations
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-
-        // Load views
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'iam-client');
-
-        // Publish config
+        // Publish config/migrations/views (always available)
         $this->publishes([
             __DIR__ . '/../config/iam.php' => config_path('iam.php'),
         ], 'iam-config');
 
-        // Publish migrations
         $this->publishes([
             __DIR__ . '/../database/migrations/' => database_path('migrations'),
         ], 'iam-migrations');
 
-        // Publish views
         $this->publishes([
             __DIR__ . '/../resources/views' => resource_path('views/vendor/iam-client'),
         ], 'iam-views');
+
+        // If package disabled via config, skip runtime registrations (routes/middleware)
+        if (! config('iam.enabled', true)) {
+            return;
+        }
+
+        // Load routes, migrations and views when enabled
+        $this->loadRoutesFrom(__DIR__ . '/../routes/iam-client.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'iam-client');
 
         // Register middleware alias
         $router = $this->app['router'];
         $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);
         $router->aliasMiddleware('iam.backchannel.verify', \Juniyasyos\IamClient\Http\Middleware\VerifyIamBackchannelSignature::class);
+        $router->aliasMiddleware('iam.verify', \Juniyasyos\IamClient\Http\Middleware\VerifyIamToken::class);
+
+        // Optionally auto-attach the verify middleware to the `web` group when configured
+        if (config('iam.attach_verify_middleware', false)) {
+            $router->pushMiddlewareToGroup('web', \Juniyasyos\IamClient\Http\Middleware\VerifyIamToken::class);
+        }
 
         FilamentIntegration::boot();
     }

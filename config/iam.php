@@ -11,6 +11,8 @@ return [
     | must contain this app_key in the payload for validation.
     |
     */
+    'enabled' => env('IAM_ENABLED', false),
+
     'app_key' => env('IAM_APP_KEY', 'client-app'),
 
     /*
@@ -23,6 +25,29 @@ return [
     |
     */
     'jwt_secret' => env('IAM_JWT_SECRET', 'change-me'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | JWT Algorithm and Leeway
+    |--------------------------------------------------------------------------
+    |
+    | Algorithm used to sign JWTs (default HS256) and optional leeway (secs)
+    |
+    */
+    'jwt_algorithm' => env('IAM_JWT_ALGORITHM', 'HS256'),
+    'jwt_leeway' => (int) env('IAM_JWT_LEEWAY', 0),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Optional issuer / audience checks
+    |--------------------------------------------------------------------------
+    |
+    | When set, the middleware will validate the token's `iss` / `aud` claims
+    | against these configuration values.
+    |
+    */
+    'issuer' => env('IAM_ISSUER', env('IAM_BASE_URL', null)),
+    'audience' => env('IAM_AUDIENCE', null),
 
     /*
     |--------------------------------------------------------------------------
@@ -191,8 +216,19 @@ return [
     */
     'verify_each_request' => env('IAM_VERIFY_EACH_REQUEST', true),
 
-    /*
+    /*    |--------------------------------------------------------------------------
+    | Auto‑attach verify middleware
     |--------------------------------------------------------------------------
+    |
+    | When `true` the package will automatically push its `iam.verify`
+    | middleware into the application's `web` middleware group. Leave
+    | `false` to register the middleware alias only and let the app add it
+    | to Kernel manually.
+    |
+    */
+    'attach_verify_middleware' => env('IAM_ATTACH_VERIFY_MIDDLEWARE', false),
+
+    /*    |--------------------------------------------------------------------------
     | Logout Route Name
     |--------------------------------------------------------------------------
     |

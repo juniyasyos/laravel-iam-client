@@ -98,6 +98,11 @@ Controller untuk handle callback dari IAM:
 - **IamUserProvisioner**: verifikasi token via endpoint HTTP, mapping payload ke kolom user, serta sinkronisasi role.
 - **IamClientManager**: pilih guard, login user, simpan data IAM di session, dan broadcast event `IamAuthenticated`.
 
+### Verify‑each‑request middleware
+- `VerifyIamToken` middleware verifies `iam.access_token` with IAM on every request when `config('iam.verify_each_request')` is true.
+- Middleware alias: `iam.verify` (registers automatically). You can opt to have the package push it into the application `web` group by setting `iam.attach_verify_middleware` to `true` in config / env.
+- This lets client apps enforce token validity for every route/refresh without custom middleware.
+
 ## Published Files
 
 Ketika package diinstall dan published:

@@ -57,11 +57,63 @@ class User extends Authenticatable
 
 ### 3. Gunakan Middleware & Route
 
+Package ini mendaftarkan beberapa `middleware` siap pakai untuk melindungi route, memverifikasi token, dan mengamankan back‑channel request.
+
+#### Alias middleware yang tersedia
+
+- `iam.auth` — pastikan user ter‑authenticate (kelas: `EnsureAuthenticated`). Menerima optional `guard` parameter: `iam.auth:web` atau `iam.auth:filament`.
+- `iam.verify` — verifikasi access token ke endpoint IAM pada tiap request bila diaktifkan (kelas: `VerifyIamToken`).
+- `iam.backchannel.verify` — verifikasi signature HMAC pada request back‑channel (kelas: `VerifyIamBackchannelSignature`).
+
+#### Contoh dasar (web)
+
 ```php
 Route::middleware(['iam.auth:web'])->group(function () {
     Route::get('/dashboard', DashboardController::class);
 });
 ```
+
+Untuk Filament atau guard lain cukup ubah parameter guard:
+
+```php
+Route::get('/admin', AdminController::class)->middleware('iam.auth:filament');
+```
+
+#### Verifikasi token per‑request (opsional)
+
+- Middleware: `iam.verify` — memanggil `config('iam.verify_endpoint')` untuk memastikan token masih valid.
+- Toggle via config: `iam.verify_each_request` (default: `true`).
+- Auto‑attach ke group `web` bila `iam.attach_verify_middleware` diset `true`.
+
+Contoh menambahkan verifikasi explicit pada route:
+
+```php
+Route::middleware(['iam.verify', 'iam.auth:web'])->group(function () {
+    // protected routes
+});
+```
+
+Untuk API yang meminta JSON, middleware akan mengembalikan respons `401` berformat JSON ketika token tidak valid.
+
+#### Back‑channel / OP‑initiated logout
+
+Gunakan `iam.backchannel.verify` pada endpoint yang menerima notifikasi dari IAM (memverifikasi HMAC SHA256).
+
+```php
+Route::post('/iam/backchannel', [\Juniyasyos\IamClient\Http\Controllers\BackchannelLogoutController::class, 'handle'])
+    ->middleware('iam.backchannel.verify');
+```
+
+Signature middleware memeriksa secret dari `config('sso.secret')` atau `env('SSO_SECRET')` dan akan mengembalikan `403` bila tidak valid.
+
+#### Catatan konfigurasi cepat
+
+- `iam.verify_each_request` — aktifkan/disable verifikasi token setiap request.
+- `iam.attach_verify_middleware` — bila `true`, package otomatis menambahkan `iam.verify` ke group `web`.
+- `iam.require_roles` — tolak sesi jika token tidak mengandung role (dicek oleh `iam.auth`).
+- `store_access_token_in_session` — middleware verifikasi membaca token dari session (`iam.access_token`).
+
+> Middleware alias didaftarkan otomatis oleh package (`IamClientServiceProvider`). Anda tidak perlu mendaftarkannya manual kecuali ingin override di `app/Http/Kernel.php`.
 
 ```blade
 <a href="{{ route('iam.sso.login') }}">Login via IAM</a>

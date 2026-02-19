@@ -20,7 +20,7 @@ class EnsureAuthenticated
     public function handle(Request $request, Closure $next, string $guard = 'web')
     {
         // Force session start if not started
-        if (!session()->isStarted()) {
+        if (! session()->isStarted()) {
             session()->start();
         }
 
@@ -28,18 +28,28 @@ class EnsureAuthenticated
         $guardName = IamConfig::guardName($guard);
         $guardInstance = Auth::guard($guardName);
 
-        if (! $guardInstance->check()) {
-            Log::info('IAM auth middleware: User not authenticated', [
+        // --- Primary check: require a valid IAM access token in session ----------
+        $accessToken = session('iam.access_token');
+
+        if (empty($accessToken)) {
+            Log::info('IAM auth middleware: missing access_token in session; forcing logout', [
                 'path' => $request->path(),
                 'session_id' => $sessionId,
-                'session_started' => session()->isStarted(),
                 'guard' => $guardName,
             ]);
 
-            // Store intended URL
+            // Clear local auth/session state and redirect to SSO login
+            if ($guardInstance->check()) {
+                $guardInstance->logout();
+            }
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $request->session()->forget('iam');
+
+            // Preserve intended URL so user returns after SSO
             session(['url.intended' => $request->fullUrl()]);
 
-            // Get login route from config
             $loginRoute = IamConfig::loginRouteName($guard);
 
             if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
@@ -49,14 +59,87 @@ class EnsureAuthenticated
             return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Please login to continue.');
         }
 
-        Log::debug('IAM auth middleware: User authenticated', [
-            'user_id' => $guardInstance->id(),
-            'path' => $request->path(),
-            'session_id' => $sessionId,
-            'guard' => $guardName,
-        ]);
+        // --- Decode & validate token locally (signature + exp + iss/aud when configured) ---
+        try {
+            $payload = \Juniyasyos\IamClient\Support\TokenValidator::decode($accessToken);
+        } catch (\Throwable $e) {
+            Log::warning('IAM auth middleware: access token invalid — clearing session', [
+                'error' => $e->getMessage(),
+                'session_id' => $sessionId,
+            ]);
 
-        // Enforce roles for active sessions when configured (prevents existing sessions without roles)
+            if ($guardInstance->check()) {
+                $guardInstance->logout();
+            }
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $request->session()->forget('iam');
+
+            $loginRoute = IamConfig::loginRouteName($guard);
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['message' => 'Session invalid, please login again.'], 401);
+            }
+
+            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                return redirect()->route($loginRoute)->with('warning', 'Session invalid, please login again.');
+            }
+
+            return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session invalid, please login again.');
+        }
+
+        // Ensure token contains subject
+        $tokenSub = $payload->sub ?? null;
+        if (! $tokenSub) {
+            Log::warning('IAM auth middleware: token missing sub claim — clearing session', ['session_id' => $sessionId]);
+
+            if ($guardInstance->check()) {
+                $guardInstance->logout();
+            }
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $request->session()->forget('iam');
+
+            $loginRoute = IamConfig::loginRouteName($guard);
+            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                return redirect()->route($loginRoute)->with('warning', 'Invalid session.');
+            }
+
+            return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Invalid session.');
+        }
+
+        // Prevent session reuse across different SSO subjects
+        $sessionSub = session('iam.sub');
+        if (! $sessionSub || ((string) $sessionSub !== (string) $tokenSub)) {
+            Log::info('IAM auth middleware: token subject mismatch with session; clearing session', [
+                'token_sub' => $tokenSub,
+                'session_sub' => $sessionSub,
+                'session_id' => $sessionId,
+            ]);
+
+            if ($guardInstance->check()) {
+                $guardInstance->logout();
+            }
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            $request->session()->forget('iam');
+
+            $loginRoute = IamConfig::loginRouteName($guard);
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['message' => 'Session mismatch, please login again.'], 401);
+            }
+
+            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                return redirect()->route($loginRoute)->with('warning', 'Session mismatch, please login again.');
+            }
+
+            return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session mismatch, please login again.');
+        }
+
+        // Optional: enforce roles for active sessions (existing behaviour)
         if (config('iam.require_roles', false)) {
             $sessionRoles = session('iam.roles', []);
 
@@ -67,8 +150,10 @@ class EnsureAuthenticated
                     'path' => $request->path(),
                 ]);
 
-                // Invalidate local session and redirect to login (will prevent access)
-                Auth::guard($guardName)->logout();
+                if ($guardInstance->check()) {
+                    $guardInstance->logout();
+                }
+
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 $request->session()->forget('iam');
@@ -83,54 +168,8 @@ class EnsureAuthenticated
             }
         }
 
-        // Optional: verify stored IAM access token with IAM on every request.
-        if (config('iam.verify_each_request', true)) {
-            $accessToken = session('iam.access_token');
-
-            if (! empty($accessToken)) {
-                try {
-                    $verifyEndpoint = IamConfig::verifyEndpoint();
-                    $resp = \Illuminate\Support\Facades\Http::timeout(3)->post($verifyEndpoint, ['token' => $accessToken]);
-
-                    if (! $resp->ok()) {
-                        Log::warning('IAM middleware: token introspection failed — clearing session', [
-                            'status' => $resp->status(),
-                            'session_id' => $sessionId,
-                        ]);
-
-                        Auth::guard($guardName)->logout();
-                        $request->session()->invalidate();
-                        $request->session()->regenerateToken();
-                        $request->session()->forget('iam');
-
-                        $loginRoute = IamConfig::loginRouteName($guard);
-
-                        if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
-                            return redirect()->route($loginRoute)->with('warning', 'Session expired, please login again.');
-                        }
-
-                        return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session expired, please login again.');
-                    }
-                } catch (\Exception $e) {
-                    Log::error('IAM middleware: token introspection request failed', [
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    Auth::guard($guardName)->logout();
-                    $request->session()->invalidate();
-                    $request->session()->regenerateToken();
-                    $request->session()->forget('iam');
-
-                    $loginRoute = IamConfig::loginRouteName($guard);
-
-                    if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
-                        return redirect()->route($loginRoute)->with('warning', 'Authentication verification failed.');
-                    }
-
-                    return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Authentication verification failed.');
-                }
-            }
-        }
+        // Keep session payload synced with verified token
+        session(['iam.payload' => (array) $payload, 'iam.sub' => $tokenSub]);
 
         return $next($request);
     }

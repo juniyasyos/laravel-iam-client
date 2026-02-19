@@ -36,6 +36,13 @@ class SsoCallbackController extends Controller
         }
 
         try {
+            // Force full local session reset BEFORE setting authenticated user to
+            // ensure we never reuse an old session when SSO identity changes.
+            \Illuminate\Support\Facades\Auth::logout();
+            session()->invalidate();
+            session()->regenerate();
+            session()->regenerateToken();
+
             $this->manager->loginWithToken($token, $guard);
         } catch (IamAuthenticationException $exception) {
             Log::warning('IAM authentication failed', [
