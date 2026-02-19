@@ -96,21 +96,27 @@
 
 <body>
     <div class="container">
-        <div class="spinner"></div>
-        <h2>🔄 Processing Login</h2>
-        <p>Please wait while we complete your authentication...</p>
+        <div class="spinner" @if(isset($serverError)) style="display:none" @endif></div>
+        <h2 @if(isset($serverError)) style="display:none" @endif>🔄 Processing Login</h2>
+        <p @if(isset($serverError)) style="display:none" @endif>Please wait while we complete your authentication...</p>
 
-        <div class="error" id="errorMessage">
+        <div class="error" id="errorMessage" @if(isset($serverError)) style="display:block" @endif>
             <h3>❌ Authentication Failed</h3>
-            <p id="errorText">No access token found in URL</p>
-            @if (\Illuminate\Support\Facades\Route::has(config('iam.login_route_name', 'login')))
+            <p id="errorText">@if(isset($serverError)) {{ $serverError }} @else No access token found in URL @endif</p>
+
+            <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                @if (\Illuminate\Support\Facades\Route::has(config('iam.login_route_name', 'login')))
                 <a href="{{ route(config('iam.login_route_name', 'login')) }}">Try Again</a>
-            @else
+                @else
                 <a href="{{ url(config('iam.login_route', '/sso/login')) }}">Try Again</a>
-            @endif
+                @endif
+
+                <a href="/" style="background:#6b7280">Return home</a>
+            </div>
         </div>
     </div>
 
+    @unless(isset($serverError))
     <script>
         (function() {
             console.log('IAM Callback Handler: Starting token extraction...');
@@ -176,6 +182,7 @@
             }
         })();
     </script>
+    @endunless
 </body>
 
 </html>

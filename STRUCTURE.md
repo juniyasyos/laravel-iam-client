@@ -92,6 +92,7 @@ Controller untuk handle callback dari IAM:
 - Terima token dari IAM (query atau fragment)
 - Serahkan ke IamClientManager untuk verifikasi & login
 - Redirect ke URL yang diinginkan/guard terkait
+- Jika provisioning/otorisasi gagal (contoh: missing identifier, insufficient roles) controller sekarang merender `callback-handler` dengan pesan error — mencegah redirect loop ke SSO login dan menampilkan pesan yang jelas kepada pengguna.
 
 ### IamUserProvisioner & IamClientManager
 - **IamUserProvisioner**: verifikasi token via endpoint HTTP, mapping payload ke kolom user, serta sinkronisasi role.

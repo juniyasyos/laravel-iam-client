@@ -18,6 +18,17 @@ class IamClientServiceProvider extends ServiceProvider
         if (file_exists($configPath)) {
             $this->mergeConfigFrom($configPath, 'iam');
         }
+
+        // Warn if the configured identifier_field is not present in user_fields mapping.
+        // This helps catch misconfigurations like identifier_field=nip without mapping 'nip' => 'nip'.
+        $this->app->booted(function () {
+            $identifier = config('iam.identifier_field', 'email');
+            $fields = array_keys(config('iam.user_fields', []));
+
+            if ($identifier && ! in_array($identifier, $fields, true)) {
+                \Illuminate\Support\Facades\Log::warning('IAM config mismatch: identifier_field [' . $identifier . '] is not mapped in iam.user_fields; provisioning may fail.');
+            }
+        });
     }
 
     /**

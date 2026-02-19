@@ -12,9 +12,7 @@ use Juniyasyos\IamClient\Support\IamConfig;
 
 class SsoCallbackController extends Controller
 {
-    public function __construct(private readonly IamClientManager $manager)
-    {
-    }
+    public function __construct(private readonly IamClientManager $manager) {}
 
     /**
      * Handle SSO callback from IAM server.
@@ -42,20 +40,14 @@ class SsoCallbackController extends Controller
                 'guard' => $guard,
             ]);
 
-            $loginRoute = IamConfig::loginRouteName($guard);
+            // Prevent redirect loop: do NOT redirect back to SSO login on provisioning/authorization errors.
+            // Instead render the callback handler with a server-side error message so the client UI can show a popup.
+            $message = $exception->getMessage();
 
-            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
-                return redirect()->route($loginRoute)->withErrors([
-                    'sso' => $exception->getMessage(),
-                ]);
-            }
-
-            // Fallback to configured login path when route name is not present
-            $loginPath = config('iam.login_route', '/sso/login');
-
-            return redirect()->to($loginPath)->withErrors([
-                'sso' => $exception->getMessage(),
-            ]);
+            return response()->view('iam-client::callback-handler', [
+                'serverError' => $message,
+                'serverErrorContext' => $exception->context ?? null,
+            ], 403);
         }
 
         $redirectTo = IamConfig::guardRedirect($guard);
