@@ -4,6 +4,7 @@ namespace Juniyasyos\IamClient\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Juniyasyos\IamClient\Exceptions\IamAuthenticationException;
@@ -16,8 +17,11 @@ class SsoCallbackController extends Controller
 
     /**
      * Handle SSO callback from IAM server.
+     *
+     * Returns either a RedirectResponse (on success / intended redirect)
+     * or a Response when rendering the callback view with an error.
      */
-    public function __invoke(Request $request, string $guard = 'web'): RedirectResponse
+    public function __invoke(Request $request, string $guard = 'web'): Response|RedirectResponse
     {
         $token = $request->input('token') ?? $request->input('access_token');
 
