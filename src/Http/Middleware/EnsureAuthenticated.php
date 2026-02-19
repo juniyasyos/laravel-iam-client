@@ -56,6 +56,33 @@ class EnsureAuthenticated
             'guard' => $guardName,
         ]);
 
+        // Enforce roles for active sessions when configured (prevents existing sessions without roles)
+        if (config('iam.require_roles', false)) {
+            $sessionRoles = session('iam.roles', []);
+
+            if (empty($sessionRoles)) {
+                Log::warning('IAM auth middleware: rejecting session because no roles present', [
+                    'user_id' => $guardInstance->id(),
+                    'session_id' => $sessionId,
+                    'path' => $request->path(),
+                ]);
+
+                // Invalidate local session and redirect to login (will prevent access)
+                Auth::guard($guardName)->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                $request->session()->forget('iam');
+
+                $loginRoute = IamConfig::loginRouteName($guard);
+
+                if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                    return redirect()->route($loginRoute)->with('warning', 'Access denied: no roles assigned in SSO token.');
+                }
+
+                return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Access denied: no roles assigned in SSO token.');
+            }
+        }
+
         // Optional: verify stored IAM access token with IAM on every request.
         if (config('iam.verify_each_request', true)) {
             $accessToken = session('iam.access_token');
