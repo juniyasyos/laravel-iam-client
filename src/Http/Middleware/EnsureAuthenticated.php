@@ -42,8 +42,11 @@ class EnsureAuthenticated
             // Get login route from config
             $loginRoute = IamConfig::loginRouteName($guard);
 
-            return redirect()->route($loginRoute)
-                ->with('warning', 'Please login to continue.');
+            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                return redirect()->route($loginRoute)->with('warning', 'Please login to continue.');
+            }
+
+            return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Please login to continue.');
         }
 
         Log::debug('IAM auth middleware: User authenticated', [
@@ -75,7 +78,11 @@ class EnsureAuthenticated
 
                         $loginRoute = IamConfig::loginRouteName($guard);
 
-                        return redirect()->route($loginRoute)->with('warning', 'Session expired, please login again.');
+                        if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                            return redirect()->route($loginRoute)->with('warning', 'Session expired, please login again.');
+                        }
+
+                        return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session expired, please login again.');
                     }
                 } catch (\Exception $e) {
                     Log::error('IAM middleware: token introspection request failed', [
@@ -89,7 +96,11 @@ class EnsureAuthenticated
 
                     $loginRoute = IamConfig::loginRouteName($guard);
 
-                    return redirect()->route($loginRoute)->with('warning', 'Authentication verification failed.');
+                    if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                        return redirect()->route($loginRoute)->with('warning', 'Authentication verification failed.');
+                    }
+
+                    return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Authentication verification failed.');
                 }
             }
         }

@@ -42,7 +42,18 @@ class SsoCallbackController extends Controller
                 'guard' => $guard,
             ]);
 
-            return redirect()->route(IamConfig::loginRouteName($guard))->withErrors([
+            $loginRoute = IamConfig::loginRouteName($guard);
+
+            if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                return redirect()->route($loginRoute)->withErrors([
+                    'sso' => $exception->getMessage(),
+                ]);
+            }
+
+            // Fallback to configured login path when route name is not present
+            $loginPath = config('iam.login_route', '/sso/login');
+
+            return redirect()->to($loginPath)->withErrors([
                 'sso' => $exception->getMessage(),
             ]);
         }

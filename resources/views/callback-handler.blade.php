@@ -103,7 +103,11 @@
         <div class="error" id="errorMessage">
             <h3>❌ Authentication Failed</h3>
             <p id="errorText">No access token found in URL</p>
-            <a href="{{ route(config('iam.login_route_name', 'login')) }}">Try Again</a>
+            @if (\Illuminate\Support\Facades\Route::has(config('iam.login_route_name', 'login')))
+                <a href="{{ route(config('iam.login_route_name', 'login')) }}">Try Again</a>
+            @else
+                <a href="{{ url(config('iam.login_route', '/sso/login')) }}">Try Again</a>
+            @endif
         </div>
     </div>
 
