@@ -197,6 +197,21 @@ return [
     'sync_users' => env('IAM_SYNC_USERS', true),
 
     /*
+    |------------------------------------------------------------------------
+    | Back-channel authentication method
+    |------------------------------------------------------------------------
+    |
+    | Controls how requests originating from the IAM server are authenticated
+    | when they hit a client application's back‑channel endpoints (such as
+    | `/api/iam/sync-users`).  The preferred value is `jwt`, which requires a
+    | signed token to be included in the `Authorization: Bearer` header.
+    | The legacy option `hmac` continues to verify an HMAC/sha256 using the
+    | shared `sso.secret` value for compatibility with existing deployments.
+    |
+    */
+    'backchannel_method' => env('IAM_BACKCHANNEL_METHOD', 'jwt'),
+
+    /*
     |--------------------------------------------------------------------------
     | Role enforcement (optional)
     |--------------------------------------------------------------------------
