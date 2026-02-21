@@ -5,6 +5,7 @@ namespace Juniyasyos\IamClient\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Juniyasyos\IamClient\Support\IamConfig;
 
 class SyncUsersController extends Controller
 {
@@ -25,6 +26,15 @@ class SyncUsersController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
+        if (! IamConfig::syncUsersEnabled()) {
+            // feature disabled, behave as if endpoint does not exist
+            abort(404);
+        }
+
+        // note: the `app_key` query parameter is intentionally ignored by
+        // default; the server no longer needs to supply it (see configuration
+        // in the IAM server).  if you still require it for compatibility you
+        // can inspect `$request->query('app_key')` here.
         $appKey = $request->query('app_key');
 
         $userModel = config('iam.user_model', \App\Models\User::class);

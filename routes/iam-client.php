@@ -22,8 +22,13 @@ use Juniyasyos\IamClient\Support\IamConfig;
 // documented in the package README and the server-side docs.
 Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
     // returned JSON structure matches what the server's sync services expect
-    Route::get('/api/iam/sync-users', \Juniyasyos\IamClient\Http\Controllers\SyncUsersController::class)
-        ->name('iam.sync-users');
+
+    if (\Juniyasyos\IamClient\Support\IamConfig::syncUsersEnabled()) {
+        // only expose the user-sync endpoint when enabled; otherwise the route
+        // is not registered and any incoming request will receive a 404.
+        Route::get('/api/iam/sync-users', \Juniyasyos\IamClient\Http\Controllers\SyncUsersController::class)
+            ->name('iam.sync-users');
+    }
 
     Route::get('/api/iam/sync-roles', SyncRolesController::class)
         ->name('iam.sync-roles');

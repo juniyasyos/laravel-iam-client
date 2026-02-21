@@ -2,6 +2,9 @@
 
 namespace Juniyasyos\IamClient\Support;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
 class IamConfig
 {
     public static function guardConfig(string $guard): array
@@ -111,4 +114,38 @@ class IamConfig
 
         return data_get($config, $key, $default);
     }
-}
+
+    /**
+     * Whether the user‑sync endpoint should be active.  This check first
+     * looks for a database-backed setting so that administrators can toggle
+     * the flag at runtime; it falls back to the regular config value so that
+     * existing installations continue to work and tests can rely on the
+     * environment variable.
+     */
+    public static function syncUsersEnabled(): bool
+    {
+        if (Schema::hasTable('iam_settings')) {
+            $value = \DB::table('iam_settings')->value('sync_users');
+
+            if ($value !== null) {
+                return (bool) $value;
+            }
+        }
+
+        return (bool) config('iam.sync_users', true);
+    }
+
+    /**
+     * Whether the user‑sync endpoint should be active.  This check first
+     * looks for a database-backed setting so that administrators can toggle
+     * the flag at runtime; it falls back to the regular config value so that
+     * existing installations continue to work and tests can rely on the
+     * environment variable.
+     */
+    public static function syncUsersEnabled(): bool
+    {
+        // we do a very light touch to avoid needing the schema builder all the
+        // time, but the migration ensures the table will exist once the package
+        // is set up.
+        if (app()->runningInConsole() === false && 
+            \

@@ -174,8 +174,27 @@ return [
     | Enable automatic role sync from IAM token to Spatie Permission
     |
     */
+    /*
+    |
+    | Role Synchronization
+    |
+    */
     'sync_roles' => env('IAM_SYNC_ROLES', true),
     'role_guard_name' => env('IAM_ROLE_GUARD_NAME', 'web'),
+
+    /*
+    |------------------------------------------------------------------------
+    | User Sync Endpoint
+    |------------------------------------------------------------------------
+    |
+    | Toggle whether the `/api/iam/sync-users` route should be exposed.  Set
+    | to `false` to disable the export endpoint entirely – requests from the
+    | IAM server will be rejected and the route will not be registered.  This
+    | can be used as a safety switch when you want to temporarily prevent
+    | automated user synchronisation without modifying server configuration.
+    |
+    */
+    'sync_users' => env('IAM_SYNC_USERS', true),
 
     /*
     |--------------------------------------------------------------------------
