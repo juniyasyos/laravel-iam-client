@@ -104,6 +104,35 @@ Route::post('/iam/backchannel', [\Juniyasyos\IamClient\Http\Controllers\Backchan
     ->middleware('iam.backchannel.verify');
 ```
 
+### Sync endpoints
+
+The package exposes two lightweight API routes that the IAM server uses to
+synchronize data from the client application:
+
+```php
+Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
+    Route::get('/api/iam/sync-users', \Juniyasyos\IamClient\Http\Controllers\SyncUsersController::class)
+        ->name('iam.sync-users');
+
+    Route::get('/api/iam/sync-roles', \Juniyasyos\IamClient\Http\Controllers\SyncRolesController::class)
+        ->name('iam.sync-roles');
+});
+```
+
+Both routes require a valid HMAC signature (see the `iam.backchannel.verify`
+middleware) and they accept an `app_key` query parameter which is echoed back.
+
+- **`sync-users`** returns all local users using the fields mapped via
+  `config('iam.user_fields')`.  If your user model implements the Spatie
+  permission package the `roles` key will also be included.
+- **`sync-roles`** returns all available roles (used by the server to keep
+  the source of truth in sync).
+
+When registering your application in the IAM server you should point the
+appropriate sync URLs to these routes and ensure the shared secret is
+configured under `SSO_SECRET`/`sso.secret`.
+
+
 Signature middleware memeriksa secret dari `config('sso.secret')` atau `env('SSO_SECRET')` dan akan mengembalikan `403` bila tidak valid.
 
 #### Catatan konfigurasi cepat

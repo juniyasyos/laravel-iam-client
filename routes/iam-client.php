@@ -17,8 +17,14 @@ use Juniyasyos\IamClient\Support\IamConfig;
 |
 */
 
-// API endpoint for IAM role synchronization
-Route::middleware('api')->group(function () {
+// API endpoints for IAM synchronization.  Both routes are protected by the
+// `iam.backchannel.verify` middleware which applies the HMAC signature check
+// documented in the package README and the server-side docs.
+Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
+    // returned JSON structure matches what the server's sync services expect
+    Route::get('/api/iam/sync-users', \Juniyasyos\IamClient\Http\Controllers\SyncUsersController::class)
+        ->name('iam.sync-users');
+
     Route::get('/api/iam/sync-roles', SyncRolesController::class)
         ->name('iam.sync-roles');
 });
