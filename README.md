@@ -99,6 +99,12 @@ Untuk API yang meminta JSON, middleware akan mengembalikan respons `401` berform
 
 Gunakan `iam.backchannel.verify` pada endpoint yang menerima notifikasi dari IAM (memverifikasi HMAC SHA256).
 
+> **Development tip:** jika Anda tidak memerlukan keamanan sama sekali, set
+> `IAM_BACKCHANNEL_VERIFY=false`.  Rute back‑channel dan sinkronisasi akan
+tetap tersedia, tetapi middleware verifikasi tidak akan dipasang sehingga
+semua request diterima.
+
+
 ```php
 Route::post('/iam/backchannel', [\Juniyasyos\IamClient\Http\Controllers\BackchannelLogoutController::class, 'handle'])
     ->middleware('iam.backchannel.verify');
