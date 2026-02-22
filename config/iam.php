@@ -198,6 +198,19 @@ return [
 
     /*
     |------------------------------------------------------------------------
+    | Back-channel security toggle
+    |------------------------------------------------------------------------
+    |
+    | Set this to `false` to disable verification entirely.  Useful during
+    | development or when you just want the sync route to exist without any
+    | HMAC/JWT checks.  The route itself can still be turned off with
+    | `sync_users`.
+    |
+    */
+    'backchannel_verify' => env('IAM_BACKCHANNEL_VERIFY', true),
+
+    /*
+    |------------------------------------------------------------------------
     | Back-channel authentication method
     |------------------------------------------------------------------------
     |
@@ -209,7 +222,7 @@ return [
     | shared `sso.secret` value for compatibility with existing deployments.
     |
     */
-    'backchannel_method' => env('IAM_BACKCHANNEL_METHOD', 'jwt'),
+    'backchannel_method' => env('IAM_BACKCHANNEL_METHOD', 'hmac'),
 
     /*
     |--------------------------------------------------------------------------

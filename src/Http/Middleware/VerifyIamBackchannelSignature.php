@@ -16,6 +16,11 @@ class VerifyIamBackchannelSignature
      */
     public function handle(Request $request, Closure $next)
     {
+        // allow disabling verification completely via config
+        if (! config('iam.backchannel_verify', true)) {
+            return $next($request);
+        }
+
         $method = config('iam.backchannel_method', 'hmac');
 
         if ($method === 'jwt') {

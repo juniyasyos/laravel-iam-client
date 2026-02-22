@@ -17,10 +17,17 @@ use Juniyasyos\IamClient\Support\IamConfig;
 |
 */
 
-// API endpoints for IAM synchronization.  Both routes are protected by the
-// `iam.backchannel.verify` middleware which applies the HMAC signature check
-// documented in the package README and the server-side docs.
-Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
+// API endpoints for IAM synchronization.  Routes may be wrapped in the
+// back-channel verification middleware depending on configuration.  This
+// allows easier testing/development when you just need the URL but don't
+// want to bother with generating a valid signature or token.
+
+$middleware = ['api'];
+if (config('iam.backchannel_verify', true)) {
+    $middleware[] = 'iam.backchannel.verify';
+}
+
+Route::middleware($middleware)->group(function () {
     // returned JSON structure matches what the server's sync services expect
 
     if (\Juniyasyos\IamClient\Support\IamConfig::syncUsersEnabled()) {
