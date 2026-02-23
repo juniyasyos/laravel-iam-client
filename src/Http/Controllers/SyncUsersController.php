@@ -31,11 +31,15 @@ class SyncUsersController extends Controller
             abort(404);
         }
 
-        // note: the `app_key` query parameter is intentionally ignored by
-        // default; the server no longer needs to supply it (see configuration
-        // in the IAM server).  if you still require it for compatibility you
-        // can inspect `$request->query('app_key')` here.
+        // the IAM server passes `app_key` purely for identification; the
+        // controller used to ignore it, but returning it in the payload makes
+        // debugging much easier (and the server is free to reject mismatches).
         $appKey = $request->query('app_key');
+
+        // optionally you can validate here if you want to harden the endpoint:
+        // if ($appKey !== config('iam.app_key')) {
+        //     abort(403, 'Invalid application key');
+        // }
 
         $userModel = config('iam.user_model', \App\Models\User::class);
         $fields = config('iam.user_fields', []);
@@ -62,6 +66,9 @@ class SyncUsersController extends Controller
             ->toArray();
 
         return response()->json([
+            // echo the app_key back so the caller can verify the origin of the
+            // data and log it.  IAM will compare this value against the one it
+            // requested.
             'app_key' => $appKey,
             'users' => $users,
             'total' => count($users),
