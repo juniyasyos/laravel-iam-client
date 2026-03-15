@@ -44,12 +44,25 @@ class LogoutController extends Controller
             'guard' => $guardName,
         ]);
 
-        $redirectRouteName = IamConfig::logoutRedirectRoute($guard);
+        // Redirect the user to the IAM server's `/logout` endpoint so the IAM
+        // session is also destroyed. The IAM server will then trigger its logout
+        // chain, which includes calling the client `/iam/logout` endpoint.
+        $iamBase = trim((string) IamConfig::baseUrl());
 
-        if ($redirectRouteName && Route::has($redirectRouteName)) {
-            return redirect()->route($redirectRouteName)->with('message', 'You have been logged out successfully.');
+        if ($iamBase === '') {
+            // Fallback: if IAM URL is not configured, fall back to the legacy
+            // behaviour of redirecting locally.
+            $redirectRouteName = IamConfig::logoutRedirectRoute($guard);
+
+            if ($redirectRouteName && Route::has($redirectRouteName)) {
+                return redirect()->route($redirectRouteName)->with('message', 'You have been logged out successfully.');
+            }
+
+            return redirect(IamConfig::guardRedirect($guard))->with('message', 'You have been logged out successfully.');
         }
 
-        return redirect(IamConfig::guardRedirect($guard))->with('message', 'You have been logged out successfully.');
+        $iamLogoutUrl = rtrim($iamBase, '/') . '/logout';
+
+        return redirect()->away($iamLogoutUrl);
     }
 }
