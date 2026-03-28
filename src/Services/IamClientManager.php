@@ -81,8 +81,18 @@ class IamClientManager
 
         $guardInstance->login($user, true);
 
-        if (config('iam.store_access_token_in_session', true)) {
-            Session::put('iam.access_token', $token);
+        // Always keep token in session for IAM API calls, even if store in session
+        // config is disabled by default developers should not break app usage.
+        Session::put('iam.access_token', $token);
+
+        if (! config('iam.store_access_token_in_session', true)) {
+            // Keep a backup key so the API can still function if middleware or user code
+            // expects an access token.
+            Session::put('iam.access_token_backup', $token);
+            Log::info('IAM access token maintained in backup key because store_access_token_in_session is false', [
+                'session_id' => session()->getId(),
+                'guard' => $guardName,
+            ]);
         }
 
         Session::put('iam.payload', $payload);

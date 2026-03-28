@@ -3,6 +3,7 @@
 namespace Juniyasyos\IamClient\Services;
 
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,7 @@ class IamServerApiService
 {
     public function getUserApplications(): array
     {
-        $token = session('iam.access_token');
+        $token = session('iam.access_token') ?: session('iam.access_token_backup');
 
         if (empty($token)) {
             Log::warning('IamServerApiService: no IAM access token in session', [
@@ -29,6 +30,16 @@ class IamServerApiService
                 return [
                     'source' => 'local-fallback',
                     'applications' => Auth::user()->accessibleApps(),
+                ];
+            }
+
+            // Another fallback possibility for old integrations: check SSO session payload.
+            $iamData = session('iam', []);
+            if (! empty($iamData) && is_array($iamData) && Arr::get($iamData, 'sub')) {
+                return [
+                    'source' => 'iam-session-fallback',
+                    'applications' => [],
+                    'hint' => 'Token missing but IAM session exists; consider re-login or cache app list',
                 ];
             }
 
