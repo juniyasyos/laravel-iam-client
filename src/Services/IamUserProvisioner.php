@@ -63,7 +63,7 @@ class IamUserProvisioner
 
         $unitKerjaValues = $this->resolveUnitKerjaValues($payload);
 
-        if (config('iam.require_unit_kerja', true) && count($unitKerjaValues) === 0) {
+        if (config('iam.require_unit_kerja', false) && count($unitKerjaValues) === 0) {
             throw new IamAuthenticationException(
                 sprintf('Unable to provision SSO user: missing required unit kerja claim [%s].', config('iam.unit_kerja_field', 'unit_kerja'))
             );
@@ -208,10 +208,22 @@ class IamUserProvisioner
 
         $userModel = config('iam.user_model', 'App\\Models\\User');
 
-        return $userModel::query()->updateOrCreate(
+        $user = $userModel::query()->updateOrCreate(
             [$identifierField => $identifierValue],
             $attributes
         );
+
+        $action = $user->wasRecentlyCreated ? 'created' : 'updated';
+        Log::info('User provisioning ' . $action, [
+            'user_id' => $user->getAuthIdentifier(),
+            'identifier_field' => $identifierField,
+            'identifier_value' => $identifierValue,
+            'email' => $user->email ?? null,
+            'nip' => $user->nip ?? null,
+            'unit_kerja' => $user->unitKerjas()->pluck('unit_name')->toArray(),
+        ]);
+
+        return $user;
     }
 
     protected function syncRoles(Model $user, array $payload): void
@@ -226,13 +238,16 @@ class IamUserProvisioner
             return;
         }
 
+        $rolesClaim = config('iam.roles_field', 'roles');
+        $rolesPayload = data_get($payload, $rolesClaim, $payload['roles'] ?? []);
+
         $roles = array_filter(array_map(function ($role) {
             if (is_array($role)) {
                 return $role['slug'] ?? $role['name'] ?? null;
             }
 
             return is_string($role) ? $role : null;
-        }, $payload['roles'] ?? []));
+        }, is_array($rolesPayload) ? $rolesPayload : []));
 
         if (empty($roles)) {
             return;
