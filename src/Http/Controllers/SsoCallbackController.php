@@ -27,11 +27,15 @@ class SsoCallbackController extends Controller
 
         Log::info('SSO callback received', [
             'token' => $token ? 'present' : 'missing',
+            'token_preview' => $token ? substr($token, 0, 10) . '...' : null,
             'session_id' => session()->getId(),
             'guard' => $guard,
+            'request_ip' => $request->ip(),
+            'request_path' => $request->path(),
         ]);
 
         if (! $token) {
+            Log::warning('SSO callback token missing', ['request' => $request->all()]);
             abort(400, 'Missing token');
         }
 

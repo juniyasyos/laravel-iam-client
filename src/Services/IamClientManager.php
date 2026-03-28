@@ -93,6 +93,17 @@ class IamClientManager
             'perms' => $payload['perms'] ?? [],
         ]);
 
+        $iamSession = session('iam');
+
+        Log::debug('IAM session set after loginWithToken', [
+            'token_preview' => $token ? substr($token, 0, 10) . '...' : null,
+            'iam_payload_sub' => $payload['sub'] ?? null,
+            'iam_payload_app' => $payload['app'] ?? null,
+            'iam_payload_roles' => $payload['roles'] ?? [],
+            'iam_payload_perms' => $payload['perms'] ?? [],
+            'iam_session' => $iamSession,
+        ]);
+
         IamAuthenticated::dispatch($user, $payload, $guardName);
 
         Log::info('IAM authentication completed', [
