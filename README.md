@@ -132,7 +132,9 @@ middleware) and they accept an `app_key` query parameter which is echoed back.
   `config('iam.user_fields')`.  If your user model implements the Spatie
   permission package the `roles` key will also be included.
 - **`sync-roles`** returns all available roles (used by the server to keep
-  the source of truth in sync).
+  the source of truth in sync). This is the classic client->IAM flow (role pull).
+- **`push-roles`** is the inverse flow (IAM->client): IAM posts authoritative
+  role list to the client and client updates existing roles (config driven).
 
 When registering your application in the IAM server you should point the
 appropriate sync URLs to these routes and ensure the shared secret is

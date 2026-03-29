@@ -121,7 +121,7 @@ return [
     |
     */
     'user_model' => env('IAM_USER_MODEL', 'App\\Models\\User'),
-
+    'application_model' => env('IAM_APPLICATION_MODEL', 'App\Domain\Iam\Models\Application'),
     /*
     |--------------------------------------------------------------------------
     | Session Preservation
@@ -261,6 +261,30 @@ return [
     |
     */
     'require_roles' => env('IAM_REQUIRE_ROLES', false),
+    'allow_roleless_sso' => env('IAM_ALLOW_ROLELESS_SSO', true),
+
+    /*
+    |------------------------------------------------------------------------
+    | Role synchronization direction
+    |------------------------------------------------------------------------
+    |
+    | `pull`: IAM pulls roles from client (`GET /api/iam/sync-roles`) (default)
+    | `push`: IAM pushes roles into client (`POST /api/iam/push-roles`)
+    |
+    */
+    'role_sync_mode' => env('IAM_ROLE_SYNC_MODE', 'pull'),
+
+    /*
+    |------------------------------------------------------------------------
+    | Role creation policy for incoming IAM role updates
+    |------------------------------------------------------------------------
+    |
+    | When `role_sync_mode` is `push`, new roles are created only if this
+    | setting is true. Default is false (update-only).
+    |
+    */
+    'role_sync_from_iam_allow_create' => env('IAM_ROLE_SYNC_FROM_IAM_ALLOW_CREATE', false),
+
     'required_roles' => env('IAM_REQUIRED_ROLES') ? array_map('trim', explode(',', env('IAM_REQUIRED_ROLES'))) : [],
 
     /*

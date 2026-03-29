@@ -140,7 +140,7 @@ class EnsureAuthenticated
         }
 
         // Optional: enforce roles for active sessions (existing behaviour)
-        if (config('iam.require_roles', false)) {
+        if (config('iam.require_roles', false) && ! config('iam.allow_roleless_sso', false)) {
             $sessionRoles = session('iam.roles', []);
 
             if (empty($sessionRoles)) {

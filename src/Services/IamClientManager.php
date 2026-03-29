@@ -55,8 +55,13 @@ class IamClientManager
             return is_string($r) ? $r : null;
         }, $payload['roles'] ?? []));
 
-        // If the application requires that tokens carry at least one role, reject otherwise
-        if (config('iam.require_roles', false) && empty($tokenRoles)) {
+        // If the application requires that tokens carry at least one role, reject otherwise.
+        // New config allow_roleless_sso bypasses this for first-time provisioning.
+        if (
+            config('iam.require_roles', false)
+            && ! config('iam.allow_roleless_sso', false)
+            && empty($tokenRoles)
+        ) {
             Log::warning('IAM callback rejected: token contains no roles but roles are required', [
                 'user_sub' => $payload['sub'] ?? null,
                 'app' => $payload['app'] ?? null,

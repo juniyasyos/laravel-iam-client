@@ -12,9 +12,19 @@ class SyncRolesController extends Controller
     /**
      * Get all roles available in this client application.
      * Used by IAM server to sync and validate roles across applications.
+     *
+     * If role sync mode is `push`, this endpoint can still respond to GET
+     * for compatibility; POST must be done to `POST /api/iam/push-roles`.
      */
     public function __invoke(Request $request): JsonResponse
     {
+        if ($request->isMethod('post')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Use POST /api/iam/push-roles for pushing roles from IAM to client.',
+            ], 405);
+        }
+
         // Get app_key from query parameter to validate request is for this app
         $appKey = $request->query('app_key');
 
