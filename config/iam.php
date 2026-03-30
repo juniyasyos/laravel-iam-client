@@ -17,6 +17,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | SSO Shared Secret
+    |--------------------------------------------------------------------------
+    |
+    | Shared secret digunakan untuk verifikasi backchannel HMAC pada endpoint
+    | /api/iam/sync-* dan /api/iam/push-roles. Disarankan menyimpan raw secret
+    | di environment (IAM_SSO_SECRET) dan tidak menulis langsung ke repository.
+    |
+    */
+    'sso_secret' => env('IAM_SSO_SECRET', env('SSO_SECRET', env('APP_KEY'))),
+
+    /*
+    |--------------------------------------------------------------------------
     | JWT Secret Key
     |--------------------------------------------------------------------------
     |
