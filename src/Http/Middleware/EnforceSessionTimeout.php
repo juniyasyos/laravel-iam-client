@@ -39,11 +39,38 @@ class EnforceSessionTimeout
 
         if ($isExpired) {
             // Token has expired, force logout
+            $userId = auth()->id();
+
             Log::warning('EnforceSessionTimeout: Token expired, logging out user', [
+                'user_id' => $userId,
                 'token_exp_at' => $tokenExpAt,
                 'now' => $now->toIso8601String(),
                 'session_id' => $request->session()->getId(),
             ]);
+
+            // Notify IAM that token expired on client side (best-effort)
+            // This allows IAM to trigger logout chain for other clients
+            if ($userId) {
+                try {
+                    $iamBaseUrl = IamConfig::baseUrl();
+                    // Convert token expiry to UTC Z format for API
+                    $expiredAtUtc = \Carbon\Carbon::parse($tokenExpAt)
+                        ->setTimezone('UTC')
+                        ->format('Y-m-d\TH:i:s\Z');
+
+                    $response = \Illuminate\Support\Facades\Http::timeout(3)->post(
+                        $iamBaseUrl . '/api/iam/notify-token-expired',
+                        [
+                            'user_id' => $userId,
+                            'app_key' => config('iam.app_key'),
+                            'expired_at' => $expiredAtUtc,
+                        ]
+                    );
+                    Log::info('EnforceSessionTimeout: Notified IAM of token expiry', ['status' => $response->status()]);
+                } catch (\Throwable $e) {
+                    Log::warning('EnforceSessionTimeout: Failed to notify IAM of token expiry', ['error' => $e->getMessage()]);
+                }
+            }
 
             Auth::logout();
             $request->session()->invalidate();

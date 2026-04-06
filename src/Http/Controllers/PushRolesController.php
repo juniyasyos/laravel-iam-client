@@ -20,9 +20,9 @@ class PushRolesController extends Controller
             ], 405);
         }
 
-        $roles = $request->input('roles', []);
+        $incomingRoles = $request->input('roles', []);
 
-        if (!is_array($roles)) {
+        if (!is_array($incomingRoles)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid payload: roles must be an array.',
@@ -35,7 +35,7 @@ class PushRolesController extends Controller
         $updated = 0;
         $skipped = 0;
 
-        foreach ($roles as $roleData) {
+        foreach ($incomingRoles as $roleData) {
             if (! is_array($roleData) || empty($roleData['slug'])) {
                 continue;
             }
@@ -81,13 +81,54 @@ class PushRolesController extends Controller
             $created++;
         }
 
+        // Build comparison for sync status reporting
+        $currentRoles = Role::all()->map(function ($role) {
+            return [
+                'id' => $role->id,
+                'slug' => $role->name, // Spatie uses 'name' as slug
+                'name' => $role->name,
+                'description' => $role->description ?? null,
+                'is_system' => false,
+            ];
+        })->values()->toArray();
+
+        $comparison = $this->compareRoles($incomingRoles, $currentRoles);
+
         return response()->json([
             'success' => true,
+            'message' => "Push completed: {$created} roles created, {$updated} roles updated" . ($skipped > 0 ? ", {$skipped} skipped (creation disabled)" : ''),
             'mode' => $mode,
             'created' => $created,
             'updated' => $updated,
             'skipped' => $skipped,
             'allow_create' => $allowCreate,
+            'iam_roles' => $incomingRoles,
+            'client_roles' => $currentRoles,
+            'comparison' => $comparison,
         ]);
+    }
+
+    /**
+     * Compare incoming IAM roles with current client roles.
+     */
+    private function compareRoles(array $iamRoles, array $clientRoles): array
+    {
+        $iamSlugs = collect($iamRoles)->pluck('slug')->flip()->toArray();
+        $clientSlugs = collect($clientRoles)->pluck('slug')->flip()->toArray();
+
+        return [
+            'in_sync' => collect($iamRoles)
+                ->filter(fn($role) => isset($clientSlugs[$role['slug']]))
+                ->values()
+                ->toArray(),
+            'missing_in_client' => collect($iamRoles)
+                ->filter(fn($role) => !isset($clientSlugs[$role['slug']]))
+                ->values()
+                ->toArray(),
+            'extra_in_client' => collect($clientRoles)
+                ->filter(fn($role) => !isset($iamSlugs[$role['slug']]))
+                ->values()
+                ->toArray(),
+        ];
     }
 }

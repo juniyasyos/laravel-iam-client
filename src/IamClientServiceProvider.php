@@ -59,15 +59,21 @@ class IamClientServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'iam-client');
 
-        // Register middleware alias
+        // Register middleware aliases
         $router = $this->app['router'];
         $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);
         $router->aliasMiddleware('iam.backchannel.verify', \Juniyasyos\IamClient\Http\Middleware\VerifyIamBackchannelSignature::class);
         $router->aliasMiddleware('iam.verify', \Juniyasyos\IamClient\Http\Middleware\VerifyIamToken::class);
+        $router->aliasMiddleware('iam.timeout', \Juniyasyos\IamClient\Http\Middleware\EnforceSessionTimeout::class);
 
         // Optionally auto-attach the verify middleware to the `web` group when configured
-        if (config('iam.attach_verify_middleware', false)) {
+        if (config('iam.attach_verify_middleware', true)) {
             $router->pushMiddlewareToGroup('web', \Juniyasyos\IamClient\Http\Middleware\VerifyIamToken::class);
+        }
+
+        // Optionally auto-attach session timeout enforcement middleware to the `web` group
+        if (config('iam.attach_enforce_timeout_middleware', true)) {
+            $router->pushMiddlewareToGroup('web', \Juniyasyos\IamClient\Http\Middleware\EnforceSessionTimeout::class);
         }
 
         if ($this->app->runningInConsole()) {

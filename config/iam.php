@@ -347,7 +347,8 @@ return [
     |
     */
     'verify_remote_each_request' => env('IAM_VERIFY_REMOTE_EACH_REQUEST', true),
-    /*    |--------------------------------------------------------------------------
+    /*
+    |--------------------------------------------------------------------------
     | Auto‑attach verify middleware
     |--------------------------------------------------------------------------
     |
@@ -357,7 +358,43 @@ return [
     | to Kernel manually.
     |
     */
-    'attach_verify_middleware' => env('IAM_ATTACH_VERIFY_MIDDLEWARE', false),
+    'attach_verify_middleware' => env('IAM_ATTACH_VERIFY_MIDDLEWARE', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sync Session Lifetime with Token Expiry
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, session lifetime will be synced with token expiry time.
+    | This ensures the session does not outlive the JWT token, preventing
+    | scenarios where an expired token is still "active" in session.
+    |
+    */
+    'sync_session_lifetime' => env('IAM_SYNC_SESSION_LIFETIME', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Lifetime Buffer (Minutes)
+    |--------------------------------------------------------------------------
+    |
+    | Buffer subtracted from token TTL when calculating session lifetime.
+    | Example: Token TTL 60 min - Buffer 2 min = Session lifetime 58 min.
+    | This prevents edge cases where token expires mid-request.
+    |
+    */
+    'session_lifetime_buffer' => (int) env('IAM_SESSION_LIFETIME_BUFFER', 2),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto‑attach session timeout enforcement middleware
+    |--------------------------------------------------------------------------
+    |
+    | When `true` the package will automatically push `EnforceSessionTimeout`
+    | middleware into the `web` group. This ensures sessions are forcefully
+    | invalidated when token expires, even if user is idle.
+    |
+    */
+    'attach_enforce_timeout_middleware' => env('IAM_ATTACH_ENFORCE_TIMEOUT_MIDDLEWARE', true),
 
     /*    |--------------------------------------------------------------------------
     | Logout Route Name
