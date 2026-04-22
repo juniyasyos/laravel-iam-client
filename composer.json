@@ -1,5 +1,5 @@
 {
-    "name": "juniyasyos/laravel-iam-client",
+    "name": "juniyasyos/auth-bridge-client",
     "description": "Laravel package for IAM SSO integration with JIT user provisioning",
     "type": "library",
     "license": "MIT",

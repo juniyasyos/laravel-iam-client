@@ -3,7 +3,7 @@
 ## v1.0.0 - 2024-01-01
 
 ### Overview
-`laravel-iam-client` is a Laravel package built for seamless Single Sign-On (SSO) integration with an IAM server. This release delivers a complete foundation for authentication, user provisioning, JWT validation, and role synchronization.
+`auth-bridge-client` is a Laravel package built for seamless Single Sign-On (SSO) integration with an IAM server. This release delivers a complete foundation for authentication, user provisioning, JWT validation, and role synchronization.
 
 ### Key Features
 - **SSO Integration** with IAM server
@@ -28,7 +28,7 @@
 
 ### Installation
 ```bash
-composer require juniyasyos/laravel-iam-client
+composer require juniyasyos/auth-bridge-client
 php artisan migrate
 php artisan vendor:publish --tag=iam-config
 ```
