@@ -1,33 +1,34 @@
 # Laravel IAM Client
 
-Package Laravel untuk integrasi Single Sign-On (SSO) dengan IAM server menggunakan JWT token dan JIT (Just-In-Time) user provisioning.
+Laravel package for IAM Single Sign-On (SSO) integration using JWT verification and Just-In-Time (JIT) user provisioning.
 
-## Fitur
+## Features
 
-- ✅ **Zero Configuration** – Minimal setup, langsung pakai
-- ✅ **Guard-aware SSO Routes** – Jalankan beberapa guard sekaligus (web/Filament/dsb)
-- ✅ **OP‑initiated logout (`/iam/logout`)** – Public endpoint tersedia; IAM dapat mengarahkan browser ke `/iam/logout` (mendukung `post_logout_redirect`).
+- ✅ **Zero configuration** — minimal setup and ready to use
+- ✅ **Guard-aware SSO routes** — support multiple guards such as `web` and `filament`
+- ✅ **OP-initiated logout** — public endpoint at `/iam/logout` for browser-based logout requests from IAM
+- ✅ **JIT user provisioning** — automatic user creation and updates during login
+- ✅ **JWT token verification** — validate access tokens using IAM endpoints
+- ✅ **Role synchronization** — optional integration with Spatie Permission
+- ✅ **Flexible field mapping** — map custom user fields like `nip`, `nik`, `employee_id`
+- ✅ **Session preservation** — retain session ID during login
+- ✅ **Optional Filament support** — add a “Login via IAM” button to Filament login screens
 
-  This package always performs a full `auth()->logout()` and session invalidation when receiving an OP‑initiated logout.
-- ✅ **JIT User Provisioning** – User otomatis dibuat/update sesuai mapping
-- ✅ **JWT Token Verification** – Validasi token via endpoint IAM
-- ✅ **Role Synchronization** – Sinkronisasi role ke Spatie Permission (opsional)
-- ✅ **Flexible Field Mapping** – Mapping bebas (nip, nik, employee_id, dll)
-- ✅ **Session Preservation** – Menjaga session ID saat login
-- ✅ **Filament Hooks (Opsional)** – Tombol “Login via IAM” langsung di layar login panel Filament
+## Requirements
+
+- PHP `^8.1`
+- Laravel `^10.0 | ^11.0 | ^12.0`
+- `firebase/php-jwt`
+- `spatie/laravel-permission` (optional, only for role synchronization)
 
 ## Installation
 
 ```bash
 composer require juniyasyos/laravel-iam-client
 php artisan migrate
-```
-
-### Publish Configuration
-
-```bash
 php artisan vendor:publish --tag=iam-config
 ```
+
 ## Quick Start
 
 ### 1. Environment Variables
@@ -36,7 +37,7 @@ php artisan vendor:publish --tag=iam-config
 IAM_APP_KEY=your-app-key
 IAM_JWT_SECRET=your-jwt-secret
 IAM_BASE_URL=https://iam.example.com
-# Opsional
+# Optional
 IAM_VERIFY_ENDPOINT=https://iam.example.com/api/verify
 IAM_PRESERVE_SESSION_ID=true
 IAM_SYNC_ROLES=true
@@ -50,22 +51,27 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     use HasRoles;
-    
-    protected $fillable = ['iam_id', 'name', 'email', 'active'];
+
+    protected $fillable = [
+        'iam_id',
+        'name',
+        'email',
+        'active',
+    ];
 }
 ```
 
-### 3. Gunakan Middleware & Route
+### 3. Routes and Middleware
 
-Package ini mendaftarkan beberapa `middleware` siap pakai untuk melindungi route, memverifikasi token, dan mengamankan back‑channel request.
+This package registers ready-to-use middleware for authentication, token verification, and back-channel request validation.
 
-#### Alias middleware yang tersedia
+#### Available middleware aliases
 
-- `iam.auth` — pastikan user ter‑authenticate (kelas: `EnsureAuthenticated`). Menerima optional `guard` parameter: `iam.auth:web` atau `iam.auth:filament`.
-- `iam.verify` — verifikasi access token ke endpoint IAM pada tiap request bila diaktifkan (kelas: `VerifyIamToken`).
-- `iam.backchannel.verify` — verifikasi signature HMAC pada request back‑channel (kelas: `VerifyIamBackchannelSignature`).
+- `iam.auth` — ensures the user is authenticated. Accepts an optional `guard` parameter, such as `iam.auth:web` or `iam.auth:filament`.
+- `iam.verify` — verifies the access token with the IAM verification endpoint, if enabled.
+- `iam.backchannel.verify` — verifies the HMAC signature on back-channel requests.
 
-#### Contoh dasar (web)
+#### Basic web example
 
 ```php
 Route::middleware(['iam.auth:web'])->group(function () {
@@ -73,19 +79,19 @@ Route::middleware(['iam.auth:web'])->group(function () {
 });
 ```
 
-Untuk Filament atau guard lain cukup ubah parameter guard:
+To use a different guard, change the parameter:
 
 ```php
 Route::get('/admin', AdminController::class)->middleware('iam.auth:filament');
 ```
 
-#### Verifikasi token per‑request (opsional)
+#### Per-request token verification (optional)
 
-- Middleware: `iam.verify` — memanggil `config('iam.verify_endpoint')` untuk memastikan token masih valid.
-- Toggle via config: `iam.verify_each_request` (default: `true`).
-- Auto‑attach ke group `web` bila `iam.attach_verify_middleware` diset `true`.
+- Middleware: `iam.verify` checks `config('iam.verify_endpoint')` to validate the token on each request.
+- Config toggle: `iam.verify_each_request` (default: `true`).
+- Automatically attach to the `web` group when `iam.attach_verify_middleware` is `true`.
 
-Contoh menambahkan verifikasi explicit pada route:
+Example:
 
 ```php
 Route::middleware(['iam.verify', 'iam.auth:web'])->group(function () {
@@ -93,18 +99,15 @@ Route::middleware(['iam.verify', 'iam.auth:web'])->group(function () {
 });
 ```
 
-Untuk API yang meminta JSON, middleware akan mengembalikan respons `401` berformat JSON ketika token tidak valid.
+When a JSON API request has an invalid token, the middleware returns a `401` JSON response.
 
-#### OP‑initiated logout
+#### OP-initiated logout
 
-The client package exposes a public logout endpoint at `/iam/logout` for
-browser-based logout requests initiated by the IAM server. The package no longer
-includes a separate `POST /iam/backchannel` logout route.
+A public logout endpoint is available at `/iam/logout` for IAM-initiated browser logout requests. The package handles a full `auth()->logout()` and session invalidation.
 
-### Sync endpoints
+### Sync Endpoints
 
-The package exposes two lightweight API routes that the IAM server uses to
-synchronize data from the client application:
+The package provides lightweight API routes for IAM to synchronize client application data:
 
 ```php
 Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
@@ -116,46 +119,36 @@ Route::middleware(['api', 'iam.backchannel.verify'])->group(function () {
 });
 ```
 
-Both routes require a valid HMAC signature (see the `iam.backchannel.verify`
-middleware) and they accept an `app_key` query parameter which is echoed back.
+Both routes require a valid HMAC signature and accept an `app_key` query parameter.
 
-- **`sync-users`** returns all local users using the fields mapped via
-  `config('iam.user_fields')`.  If your user model implements the Spatie
-  permission package the `roles` key will also be included.
-- **`sync-roles`** returns all available roles (used by the server to keep
-  the source of truth in sync). This is the classic client->IAM flow (role pull).
-- **`push-roles`** is the inverse flow (IAM->client): IAM posts authoritative
-  role list to the client and client updates existing roles (config driven).
+- `sync-users` returns local users using fields defined in `config('iam.user_fields')`. If Spatie Permission is enabled, the `roles` key is included.
+- `sync-roles` returns available roles so IAM can keep the source of truth synchronized.
+- `push-roles` is the reverse flow: IAM posts the authoritative role list to the client.
 
-When registering your application in the IAM server you should point the
-appropriate sync URLs to these routes and ensure the shared secret is
-configured under `SSO_SECRET`/`sso.secret`.
+When registering your app in IAM, point the sync URLs to these routes and configure the shared secret in `SSO_SECRET` / `sso.secret`.
 
+### Configuration Notes
 
-Signature middleware memeriksa secret dari `config('sso.secret')` atau `env('SSO_SECRET')` dan akan mengembalikan `403` bila tidak valid.
+- `iam.verify_each_request` — enable or disable per-request token verification.
+- `iam.attach_verify_middleware` — automatically attach `iam.verify` to the `web` group.
+- `iam.require_roles` — reject sessions when the token does not contain roles.
+- `iam.unit_kerja_field` — JWT claim name for the user’s unit/org field.
+- `iam.require_unit_kerja` — reject login when the unit/org claim is missing.
+- `iam.sync_unit_kerja` — synchronize the `unitKerjas()` relation on the user model after provisioning.
+- `iam.unit_kerja_model` — Eloquent model used for unit/org data (default: `App\\Models\\UnitKerja`).
+- `store_access_token_in_session` — store the access token in session under `iam.access_token`.
 
-#### Catatan konfigurasi cepat
-
-- `iam.verify_each_request` — aktifkan/disable verifikasi token setiap request.
-- `iam.attach_verify_middleware` — bila `true`, package otomatis menambahkan `iam.verify` ke group `web`.
-- `iam.require_roles` — tolak sesi jika token tidak mengandung role (dicek oleh `iam.auth`).
-- `iam.unit_kerja_field` — nama claim JWT yang berisi unit kerja user.
-- `iam.require_unit_kerja` — tolak login jika klaim unit kerja tidak tersedia.
-- `iam.sync_unit_kerja` — sync relasi `unitKerjas()` pada model user setelah provisioning.
-- `iam.unit_kerja_model` — model Eloquent yang mewakili unit kerja (default: `App\\Models\\UnitKerja`).
-- `store_access_token_in_session` — middleware verifikasi membaca token dari session (`iam.access_token`).
-
-> Middleware alias didaftarkan otomatis oleh package (`IamClientServiceProvider`). Anda tidak perlu mendaftarkannya manual kecuali ingin override di `app/Http/Kernel.php`.
+> Middleware aliases are registered automatically by `IamClientServiceProvider`. Manual registration in `app/Http/Kernel.php` is usually not required.
 
 ```blade
 <a href="{{ route('iam.sso.login') }}">Login via IAM</a>
 ```
 
-Semua route SSO otomatis tersedia:
+The package also registers these SSO routes:
 
-- `iam.sso.login` → redirect ke IAM
-- `iam.sso.callback` → menerima token
-- `iam.logout` → keluar & bersihkan sesi
+- `iam.sso.login` — redirects to IAM
+- `iam.sso.callback` — handles the token response
+- `iam.logout` — performs logout and session cleanup
 
 ## Custom Field Mapping
 
@@ -165,13 +158,13 @@ Semua route SSO otomatis tersedia:
     'iam_id' => 'sub',
     'name' => 'name',
     'email' => 'email',
-    'nip' => 'nip',         // Custom field
-    'nik' => 'nik',         // Custom field
+    'nip' => 'nip',
+    'nik' => 'nik',
 ],
 'identifier_field' => 'iam_id',
 ```
 
-## Token Payload
+## Token Payload Example
 
 ```json
 {
@@ -188,7 +181,7 @@ Semua route SSO otomatis tersedia:
 
 ## Multi Guard & Custom Redirect
 
-Atur guard tertentu di `config/iam.php`:
+Configure guards in `config/iam.php`:
 
 ```php
 'guards' => [
@@ -206,11 +199,11 @@ Atur guard tertentu di `config/iam.php`:
 ],
 ```
 
-Tambahkan guard baru? Cukup register route sendiri dan beri `defaults('guard', 'nama_guard')` atau panggil controller dengan parameter guard.
+To add a new guard, register your own route and set `defaults('guard', 'your_guard')` or pass the guard parameter to the controller.
 
-## Filament Integration (Opsional)
+## Filament Integration (Optional)
 
-Aktifkan dengan ENV berikut:
+Enable Filament support with these environment variables:
 
 ```env
 IAM_FILAMENT_ENABLED=true
@@ -219,21 +212,21 @@ IAM_FILAMENT_PANEL=admin
 IAM_FILAMENT_LOGIN_ROUTE=/filament/sso/login
 IAM_FILAMENT_CALLBACK_ROUTE=/filament/sso/callback
 IAM_FILAMENT_LOGIN_BUTTON="Login via IAM"
-# Opsional: override route logout Filament agar memakai controller IAM
+# Optional: override Filament logout to use IAM controller
 # IAM_FILAMENT_LOGOUT_ROUTE=/filament/logout
 ```
 
-Ketika Filament tersedia:
+When Filament is enabled:
 
-1. Route `/filament/sso/login` & `/filament/sso/callback` otomatis dibuat.
-2. Tombol "Login via IAM" tampil di halaman login panel.
-3. Logout panel dapat diarahkan ke route IAM (`iam.logout.filament`) bila Anda menentukan `IAM_FILAMENT_LOGOUT_ROUTE` sendiri.
+1. `/filament/sso/login` and `/filament/sso/callback` routes are generated.
+2. A "Login via IAM" button appears on the Filament login page.
+3. Filament logout can be routed through IAM when `IAM_FILAMENT_LOGOUT_ROUTE` is configured.
 
-> Non-Filament project? Biarkan `IAM_FILAMENT_ENABLED=false` dan package tetap bekerja seperti biasa.
+> For non-Filament apps, set `IAM_FILAMENT_ENABLED=false` and the package works normally.
 
 ## Event Hooks
 
-Setiap login sukses mem-broadcast event `IamAuthenticated`. Anda bisa mendengarkan event ini untuk audit logging, provisioning ke service lain, dsb.
+A successful login dispatches the `IamAuthenticated` event. Listen to this event for auditing, downstream provisioning, or custom logging.
 
 ```php
 use Juniyasyos\IamClient\Events\IamAuthenticated;
