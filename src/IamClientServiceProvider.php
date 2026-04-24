@@ -59,6 +59,10 @@ class IamClientServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'iam-client');
 
+        if (class_exists(\Livewire\Livewire::class)) {
+            \Livewire\Livewire::component('iam-app-switcher', \Juniyasyos\IamClient\Http\Livewire\IamAppSwitcher::class);
+        }
+
         // Register middleware aliases
         $router = $this->app['router'];
         $router->aliasMiddleware('iam.auth', \Juniyasyos\IamClient\Http\Middleware\EnsureAuthenticated::class);

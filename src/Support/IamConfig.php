@@ -86,6 +86,32 @@ class IamConfig
         return $host . '/api/users/applications';
     }
 
+    public static function userApplicationsDetailEndpoint(): string
+    {
+        $explicit = (string) config('iam.user_applications_detail_endpoint');
+
+        if ($explicit) {
+            return $explicit;
+        }
+
+        $service = (string) config('services.iam.user_applications_detail');
+
+        if ($service) {
+            return $service;
+        }
+
+        $host = self::baseUrl();
+
+        return $host . '/api/users/applications/detail';
+    }
+
+    public static function backchannelUserApplicationsEndpoint(): ?string
+    {
+        $explicit = (string) config('iam.backchannel_user_applications_endpoint');
+
+        return $explicit !== '' ? $explicit : null;
+    }
+
     public static function refreshTokenEndpoint(): string
     {
         $explicit = (string) config('iam.refresh_token_endpoint');

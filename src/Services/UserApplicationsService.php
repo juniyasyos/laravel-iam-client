@@ -106,7 +106,67 @@ class UserApplicationsService
      */
     public function getApplicationsDetail(): array
     {
-        return $this->fetchFromIam('/users/applications/detail', 'applicationsDetail');
+        $endpoint = IamConfig::backchannelUserApplicationsEndpoint()
+            ?? IamConfig::userApplicationsDetailEndpoint();
+
+        return $this->fetchFromIam($endpoint, 'applicationsDetail');
+    }
+
+    /**
+     * Get applications prepared for UI switcher components.
+     *
+     * @return array
+     */
+    public function getApplicationsForSwitcher(): array
+    {
+        $detail = $this->getApplicationsDetail();
+
+        if (!is_array($detail) || !isset($detail['applications']) || !is_array($detail['applications'])) {
+            return [];
+        }
+
+        return $this->transformApplicationsForSwitcher($detail['applications']);
+    }
+
+    /**
+     * Transform raw API response to a display-ready switcher payload.
+     *
+     * @param array $apps
+     * @return array
+     */
+    private function transformApplicationsForSwitcher(array $apps): array
+    {
+        return collect($apps)
+            ->filter(fn($app) => ($app['status'] ?? 'active') === 'active')
+            ->map(fn($app) => [
+                'id' => $app['id'] ?? null,
+                'app_key' => $app['app_key'] ?? null,
+                'name' => $app['name'] ?? 'Unknown Application',
+                'description' => $app['description'] ?? null,
+                'enabled' => ($app['status'] ?? 'active') === 'active',
+                'logo_url' => $app['metadata']['logo']['url'] ?? $app['logo_url'] ?? null,
+                'has_logo' => $app['metadata']['logo']['available'] ?? !empty($app['logo_url']),
+                'app_url' => $app['metadata']['urls']['primary'] ?? $app['app_url'] ?? null,
+                'redirect_uris' => $app['metadata']['urls']['all_redirects'] ?? $app['redirect_uris'] ?? [],
+                'status' => $app['status'] ?? 'active',
+                'roles_count' => $app['roles_count'] ?? count($app['roles'] ?? []),
+                'roles' => collect($app['roles'] ?? [])
+                    ->map(fn($role) => [
+                        'id' => $role['id'] ?? null,
+                        'slug' => $role['slug'] ?? null,
+                        'name' => $role['name'] ?? 'User',
+                        'description' => $role['description'] ?? null,
+                        'is_system' => $role['is_system'] ?? false,
+                    ])
+                    ->toArray(),
+                'urls' => $app['metadata']['urls'] ?? $app['urls'] ?? [
+                    'primary' => $app['app_url'] ?? null,
+                    'all_redirects' => $app['redirect_uris'] ?? [],
+                ],
+            ])
+            ->filter(fn($app) => !empty($app['app_url']))
+            ->values()
+            ->toArray();
     }
 
     /**
@@ -182,8 +242,8 @@ class UserApplicationsService
             ],
             'endpoints' => [
                 'base_url' => IamConfig::baseUrl(),
-                'applications' => IamConfig::baseUrl() . '/api/users/applications',
-                'applications_detail' => IamConfig::baseUrl() . '/api/users/applications/detail',
+                'applications' => IamConfig::userApplicationsEndpoint(),
+                'applications_detail' => IamConfig::userApplicationsDetailEndpoint(),
             ],
             'basic_endpoint' => $this->debugGetApplications(),
             'detail_endpoint' => $this->debugGetApplicationsDetail(),
@@ -239,7 +299,7 @@ class UserApplicationsService
 
         // Fallback: 3. Fetch from IAM server
         try {
-            $url = IamConfig::baseUrl() . '/api' . $endpoint;
+            $url = $this->buildIamUrl($endpoint);
 
             Log::info("UserApplicationsService: Fetching {$debugName} from IAM server", [
                 'user_id' => $userId,
@@ -297,6 +357,28 @@ class UserApplicationsService
                 $endpoint
             );
         }
+    }
+
+    /**
+     * Build the final IAM request URL from a package endpoint setting.
+     *
+     * Accepts a full URL or a relative IAM endpoint path.
+     */
+    private function buildIamUrl(string $endpoint): string
+    {
+        $endpoint = trim($endpoint);
+
+        if (str_starts_with($endpoint, 'http://') || str_starts_with($endpoint, 'https://')) {
+            return $endpoint;
+        }
+
+        $endpoint = ltrim($endpoint, '/');
+
+        if (!str_starts_with($endpoint, 'api/')) {
+            $endpoint = 'api/' . $endpoint;
+        }
+
+        return IamConfig::baseUrl() . '/' . $endpoint;
     }
 
     /**

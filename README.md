@@ -105,6 +105,41 @@ When a JSON API request has an invalid token, the middleware returns a `401` JSO
 
 A public logout endpoint is available at `/iam/logout` for IAM-initiated browser logout requests. The package handles a full `auth()->logout()` and session invalidation.
 
+### Livewire App Switcher
+
+The package includes a reusable Livewire component for displaying the current user's accessible IAM applications.
+
+#### Requirements
+
+- Livewire must be installed in the client application.
+- `config('iam.enabled')` must be `true`.
+- The IAM session must contain a valid access token under `iam.access_token` or `iam.access_token_backup`.
+
+#### Usage
+
+In any Blade view, render the component with:
+
+```blade
+@livewire('iam-app-switcher')
+```
+
+This component will:
+
+- fetch the current user's applications from IAM
+- cache the result for 5 minutes
+- show a dropdown with app logo, name, and active status
+- navigate to the selected application URL
+
+#### Custom view override
+
+If you need to override the package view in your application, publish the package views:
+
+```bash
+php artisan vendor:publish --tag=iam-views
+```
+
+Then copy and customize the file from `resources/views/vendor/iam-client/livewire/iam-app-switcher.blade.php`.
+
 ### Sync Endpoints
 
 The package provides lightweight API routes for IAM to synchronize client application data:

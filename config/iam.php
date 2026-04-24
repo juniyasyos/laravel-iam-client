@@ -95,6 +95,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | User applications detail endpoint on IAM server
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used by the client package to fetch detailed application
+    | metadata for the current user.
+    |
+    */
+    'user_applications_detail_endpoint' => env('IAM_USER_APPLICATIONS_DETAIL_ENDPOINT', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Backchannel user applications endpoint
+    |--------------------------------------------------------------------------
+    |
+    | Optional internal endpoint for retrieving application metadata from
+    | IAM via a more secure or optimized backchannel route.
+    |
+    */
+    'backchannel_user_applications_endpoint' => env('IAM_BACKCHANNEL_USER_APPLICATIONS_ENDPOINT', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Web Guard SSO Routes
     |--------------------------------------------------------------------------
     |
