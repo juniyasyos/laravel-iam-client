@@ -1,4 +1,39 @@
-# Laravel IAM Client Release Notes
+# Auth Bridge Client Release Notes
+
+## v1.2.0 - 2026-04-25
+
+### Overview
+Pembaruan ini memperkuat `auth-bridge-client` sebagai paket Laravel yang fokus pada sisi client IAM:
+
+- memisahkan dukungan Filament dan menjadikan package bebas Filament
+- menyatukan logika unit kerja langsung ke client
+- memperbaiki sinkronisasi `status` user (bukan `active`)
+- menambahkan endpoint sinkronisasi Unit Kerja yang lebih ringan
+- memperjelas konfigurasi dan penggunaan di klien Laravel
+
+### Highlights
+- **Non-Filament client mode:** tidak perlu memasang Filament untuk menggunakan package
+- **Unit Kerja sync:** support `GET /api/manage-unit-kerja/center/provision`, `POST /api/manage-unit-kerja/client/sync`, dan push sync
+- **Status-based user provisioning:** `status` sekarang digunakan sebagai sumber kebenaran untuk `active/inactive/suspended`
+- **Cleaner package identity:** menggunakan nama package `juniyasyos/auth-bridge-client`
+- **Lebih jelas bagi client developers:** dokumentasi dan route yang langsung relevan untuk aplikasi Laravel client
+
+### Client usage
+- `composer require juniyasyos/auth-bridge-client`
+- publish config dengan `php artisan vendor:publish --tag=iam-config`
+- jalankan migration
+- atur `IAM_APP_KEY`, `IAM_JWT_SECRET`, `IAM_BASE_URL`
+- gunakan middleware `iam.auth:web` dan route `route('iam.sso.login')`
+
+### Technical details
+- **PHP compatibility:** ^8.1
+- **Laravel compatibility:** ^10.0 | ^11.0 | ^12.0
+- **Dependencies:**
+  - `firebase/php-jwt`
+  - `spatie/laravel-permission` (opsional)
+
+### Notes
+Update ini membuat `auth-bridge-client` lebih siap dipasang di aplikasi Laravel tanpa ketergantungan Filament, serta memperkuat alur SSO, sinkronisasi user, dan unit kerja.
 
 ## v1.0.0 - 2024-01-01
 
