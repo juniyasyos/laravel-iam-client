@@ -28,14 +28,17 @@ class VerifyIamToken
             ?? $request->session()->get('iam.access_token_backup');
 
         if (empty($accessToken)) {
-            // Strict mode: if user is authenticated by IAM payload but token is missing,
-            // force relogin to avoid stale web-session without valid IAM token.
-            if (Auth::check() && $request->session()->has('iam.sub')) {
+            // Security fix: If user is authenticated but IAM token is missing,
+            // ALWAYS logout to avoid stale web-session without valid IAM token.
+            // Regardless of whether iam.sub exists, token is required for IAM-authenticated users.
+            if (Auth::check()) {
                 $userId = Auth::id();
 
                 Log::warning('IamClient::VerifyIamToken - authenticated session without IAM token; clearing session', [
                     'session_id' => $request->session()->getId(),
                     'user_id' => $userId,
+                    'iam_sub' => $request->session()->get('iam.sub'),
+                    'reason' => 'Token missing - potential session inconsistency',
                 ]);
 
                 // Clear application cache
@@ -69,7 +72,15 @@ class VerifyIamToken
 
             // keep session payload in sync
             $request->session()->put('iam.payload', (array) $payload);
-            $request->session()->put('iam.sub', $payload->sub ?? null);
+
+            // Ensure iam.sub is ALWAYS present when token exists (consistency check)
+            $sub = $payload->sub ?? null;
+            if ($sub) {
+                $request->session()->put('iam.sub', $sub);
+            } else {
+                // Token decoded but missing 'sub' claim - this is invalid
+                throw new \Exception('Token missing required "sub" (subject) claim');
+            }
         } catch (\Throwable $e) {
             $message = strtolower($e->getMessage());
 
@@ -90,7 +101,14 @@ class VerifyIamToken
                 try {
                     $payload = \Juniyasyos\IamClient\Support\TokenValidator::decode($refreshedToken);
                     $request->session()->put('iam.payload', (array) $payload);
-                    $request->session()->put('iam.sub', $payload->sub ?? null);
+
+                    // Ensure iam.sub is ALWAYS present when token exists
+                    $sub = $payload->sub ?? null;
+                    if ($sub) {
+                        $request->session()->put('iam.sub', $sub);
+                    } else {
+                        throw new \Exception('Refreshed token missing required "sub" (subject) claim');
+                    }
 
                     Log::info('IamClient::VerifyIamToken - silent token refresh successful', [
                         'session_id' => $request->session()->getId(),
