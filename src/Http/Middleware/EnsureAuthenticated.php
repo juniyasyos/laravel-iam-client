@@ -19,6 +19,11 @@ class EnsureAuthenticated
      */
     public function handle(Request $request, Closure $next, string $guard = 'web')
     {
+        // Only enforce IAM authentication if IAM is actually enabled
+        if (! config('iam.enabled', false)) {
+            return $next($request);
+        }
+
         // Force session start if not started
         if (! session()->isStarted()) {
             session()->start();

@@ -20,6 +20,11 @@ class VerifyIamToken
 {
     public function handle(Request $request, Closure $next)
     {
+        // Only run token verification if IAM is actually enabled
+        if (! config('iam.enabled', false)) {
+            return $next($request);
+        }
+
         if (! config('iam.verify_each_request', true)) {
             return $next($request);
         }

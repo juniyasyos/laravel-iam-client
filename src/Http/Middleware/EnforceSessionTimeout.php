@@ -23,6 +23,11 @@ class EnforceSessionTimeout
 {
     public function handle(Request $request, Closure $next)
     {
+        // Only run if IAM is actually enabled
+        if (! config('iam.enabled', false)) {
+            return $next($request);
+        }
+
         // Only run if session has IAM token expiry info
         $tokenExpAt = session('iam.token_exp_at');
         $tokenExpiresSeconds = session('iam.token_expires_seconds');
