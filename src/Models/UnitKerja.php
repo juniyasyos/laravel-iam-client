@@ -61,10 +61,23 @@ class UnitKerja extends Model
 
     public static function isCrudAllowed(): bool
     {
-        $center = (bool) config('iam.unit_kerja.center_application', false);
         $appEnv = (string) config('iam.app_env', app()->environment());
 
-        return $center || in_array(strtolower($appEnv), ['local', 'dev', 'development'], true) || app()->environment('local');
+        // Allow for local/dev environments
+        if (in_array(strtolower($appEnv), ['local', 'dev', 'development'], true) || app()->environment('local')) {
+            return true;
+        }
+
+        // Allow CRUD during backchannel sync/push requests from IAM center
+        // Client apps in production MUST accept unit kerja updates from IAM center
+        if (app()->has('request')) {
+            $path = request()->getPathInfo();
+            if (str_contains($path, '/api/iam/sync') || str_contains($path, '/api/iam/push')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getRouteKeyName()

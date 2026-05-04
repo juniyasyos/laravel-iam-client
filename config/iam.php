@@ -215,22 +215,20 @@ return [
 
     /*
     |------------------------------------------------------------------------
-    | Unit Kerja Center / Client Sync
+    | Unit Kerja Synchronization
     |------------------------------------------------------------------------
     |
-    | These settings control the optional Unit Kerja provisioning endpoints
-    | and the client-side sync actions that integrate with an App Center.
+    | Controls Unit Kerja sync and push endpoints for backchannel
+    | communication between IAM center and client applications.
     |
     */
     'unit_kerja' => [
-        'center_application' => env('IAM_UNIT_KERJA_CENTER_APPLICATION', false),
-        'app_center_url' => env('IAM_UNIT_KERJA_APP_CENTER_URL', null),
         'sync' => [
-            'active' => env('IAM_UNIT_KERJA_SYNC_ACTIVE', false),
+            'active' => env('IAM_UNIT_KERJA_SYNC_ACTIVE', true),
         ],
         'push' => [
             'active' => env('IAM_UNIT_KERJA_PUSH_ACTIVE', true),
-            'path' => env('IAM_UNIT_KERJA_PUSH_PATH', 'client/push'),
+            'path' => env('IAM_UNIT_KERJA_PUSH_PATH', 'api/iam/push-unit-kerja'),
             'middleware' => env('IAM_UNIT_KERJA_PUSH_MIDDLEWARE', 'api') ? explode(',', env('IAM_UNIT_KERJA_PUSH_MIDDLEWARE', 'api')) : ['api'],
         ],
     ],
