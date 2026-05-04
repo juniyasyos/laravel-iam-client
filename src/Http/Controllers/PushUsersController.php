@@ -105,14 +105,30 @@ class PushUsersController extends Controller
 
             $existingUser = $query->first();
 
+            /**
+             * Prepare data for user creation/update.
+             * IMPORTANT: 'name' field must always have a value (NOT NULL constraint).
+             * If IAM push data doesn't include 'name', use NIP as fallback.
+             * 
+             * This prevents "Field 'name' doesn't have a default value" errors
+             * when syncing users from IAM in PUSH mode.
+             */
+            $name = data_get($item, 'name');
+            if (empty($name)) {
+                // Fallback chain: use NIP, email, or generic placeholder
+                $name = $nip ?: ($email ?: 'Pengguna IAM');
+            }
+
             $dataToSave = array_filter([
                 'nip' => $nip ?? null,
                 'email' => $email ?? null,
-                'name' => data_get($item, 'name'),
                 'status' => $this->resolveStatusValue($item),
             ], function ($value) {
                 return $value !== null;
             });
+
+            // Always include 'name' with fallback value to avoid NOT NULL constraint violations
+            $dataToSave['name'] = $name;
 
             if ($existingUser) {
                 $userBefore = $existingUser->toArray();
