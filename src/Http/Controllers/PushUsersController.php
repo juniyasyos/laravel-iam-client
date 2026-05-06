@@ -142,6 +142,7 @@ class PushUsersController extends Controller
                     'after' => $existingUser->toArray(),
                 ]);
             } elseif ($allowCreate) {
+                $dataToSave['password'] = $item['password'] ?? 'rschjaya1234';
                 $newUser = $userModelClass::create($dataToSave);
                 $created++;
                 $idsToKeep[] = $newUser->getKey();
