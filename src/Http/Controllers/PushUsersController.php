@@ -132,7 +132,7 @@ class PushUsersController extends Controller
 
             if ($existingUser) {
                 $userBefore = $existingUser->toArray();
-                $existingUser->update($dataToSave);
+                $existingUser->forceFill($dataToSave)->save();
                 $updated++;
                 $idsToKeep[] = $existingUser->getKey();
 
@@ -143,7 +143,8 @@ class PushUsersController extends Controller
                 ]);
             } elseif ($allowCreate) {
                 $dataToSave['password'] = $item['password'] ?? 'rschjaya1234';
-                $newUser = $userModelClass::create($dataToSave);
+                $newUser = new $userModelClass();
+                $newUser->forceFill($dataToSave)->save();
                 $created++;
                 $idsToKeep[] = $newUser->getKey();
                 $existingUser = $newUser;
