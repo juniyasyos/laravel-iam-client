@@ -13,12 +13,13 @@ class PushUsersController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $mode = config('iam.user_sync_mode', 'pull');
+        $appKey = (string) $request->query('app_key', config('iam.app_key'));
 
         if ($mode !== 'push') {
             Log::warning('iam.client.push_users_mode_mismatch', [
                 'mode' => $mode,
                 'expected' => 'push',
-                'app_key' => $request->query('app_key'),
+                'app_key' => $appKey,
             ]);
 
             return response()->json([
@@ -32,7 +33,7 @@ class PushUsersController extends Controller
 
         Log::info('iam.client.push_users_received', [
             'count' => is_array($users) ? count($users) : null,
-            'app_key' => $request->query('app_key'),
+            'app_key' => $appKey,
         ]);
 
         if (! is_array($users)) {
@@ -64,6 +65,20 @@ class PushUsersController extends Controller
 
         foreach ($users as $item) {
             if (! is_array($item)) {
+                continue;
+            }
+
+            if (! $this->userHasAccessToApplication($item, $appKey)) {
+                $skipped++;
+                Log::info('iam.client.user_skipped_no_app_access', [
+                    'app_key' => $appKey,
+                    'candidate' => [
+                        'nip' => data_get($item, 'nip'),
+                        'email' => data_get($item, 'email'),
+                        'name' => data_get($item, 'name'),
+                    ],
+                ]);
+
                 continue;
             }
 
@@ -260,6 +275,50 @@ class PushUsersController extends Controller
                 'unit_kerja' => $unitKerjaValues,
             ]);
         }
+    }
+
+    protected function userHasAccessToApplication(array $item, string $appKey): bool
+    {
+        $appKey = trim($appKey);
+
+        if ($appKey === '') {
+            return true;
+        }
+
+        $directAppKey = data_get($item, 'app_key');
+        if (is_string($directAppKey) && $directAppKey !== '') {
+            return $directAppKey === $appKey;
+        }
+
+        foreach (['applications', 'accessible_apps', 'app_keys', 'user_applications'] as $field) {
+            $value = data_get($item, $field);
+
+            if (is_string($value) && $value !== '') {
+                if ($value === $appKey) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (! is_array($value)) {
+                continue;
+            }
+
+            foreach ($value as $application) {
+                if (is_string($application) && $application === $appKey) {
+                    return true;
+                }
+
+                if (is_array($application) && (string) data_get($application, 'app_key') === $appKey) {
+                    return true;
+                }
+            }
+        }
+
+        $roles = data_get($item, 'roles', []);
+
+        return is_array($roles) && ! empty($roles);
     }
 
     protected function normalizeUnitKerjaValues(mixed $raw): array
