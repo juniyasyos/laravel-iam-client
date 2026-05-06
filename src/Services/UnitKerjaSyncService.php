@@ -25,13 +25,27 @@ class UnitKerjaSyncService
                 continue;
             }
 
-            $unit = $unitModelClass::updateOrCreate(
-                ['slug' => $item['slug']],
-                [
+            $unit = $unitModelClass::withTrashed()
+                ->where('slug', $item['slug'])
+                ->first();
+
+            if ($unit) {
+                if (method_exists($unit, 'trashed') && $unit->trashed()) {
+                    $unit->restore();
+                }
+
+                $unit->fill([
                     'unit_name' => $item['unit_name'] ?? null,
                     'description' => $item['description'] ?? null,
-                ]
-            );
+                ]);
+                $unit->save();
+            } else {
+                $unit = $unitModelClass::create([
+                    'slug' => $item['slug'],
+                    'unit_name' => $item['unit_name'] ?? null,
+                    'description' => $item['description'] ?? null,
+                ]);
+            }
 
             $unitRecordsBySlug[$unit->slug] = $unit;
             $syncedUnits++;
