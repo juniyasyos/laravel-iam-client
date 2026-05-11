@@ -207,6 +207,12 @@ class PushUsersController extends Controller
             ]);
         }
 
+        // Handle deleted user_unit_kerja relations if provided
+        $deletedRelations = $request->input('deleted_user_unit_kerja', []);
+        if (! empty($deletedRelations) && is_array($deletedRelations)) {
+            $this->handleDeletedUserUnitKerjaRelations($deletedRelations, $userModelClass);
+        }
+
         $result = [
             'success' => true,
             'created' => $created,
@@ -375,5 +381,55 @@ class PushUsersController extends Controller
         }
 
         return 'inactive';
+    }
+
+    /**
+     * Handle deletion of user_unit_kerja relations.
+     * Detaches users from unit kerja that were removed on IAM side.
+     */
+    protected function handleDeletedUserUnitKerjaRelations(array $deletedRelations, string $userModelClass): void
+    {
+        if (empty($deletedRelations)) {
+            return;
+        }
+
+        $unitKerjaModel = config('iam.unit_kerja_model', \App\Models\UnitKerja::class);
+
+        foreach ($deletedRelations as $relation) {
+            $userId = null;
+            $unitId = null;
+
+            // Resolve user ID
+            if (! empty($relation['user_nip'])) {
+                $user = $userModelClass::where('nip', $relation['user_nip'])->first();
+                $userId = $user?->id;
+            } elseif (! empty($relation['user_email'])) {
+                $user = $userModelClass::where('email', $relation['user_email'])->first();
+                $userId = $user?->id;
+            } elseif (! empty($relation['user_id'])) {
+                $userId = $relation['user_id'];
+            }
+
+            // Resolve unit ID
+            if (! empty($relation['unit_slug'])) {
+                $unit = $unitKerjaModel::withTrashed()->where('slug', $relation['unit_slug'])->first();
+                $unitId = $unit?->id;
+            } elseif (! empty($relation['unit_kerja_id'])) {
+                $unitId = $relation['unit_kerja_id'];
+            }
+
+            // Detach the user from unit kerja
+            if ($userId && $unitId) {
+                $user = $userModelClass::find($userId);
+                if ($user && method_exists($user, 'unitKerjas')) {
+                    $user->unitKerjas()->detach($unitId);
+
+                    Log::info('iam.client.user_unit_kerja_detached_from_push', [
+                        'user_id' => $userId,
+                        'unit_kerja_id' => $unitId,
+                    ]);
+                }
+            }
+        }
     }
 }
