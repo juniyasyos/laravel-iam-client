@@ -231,6 +231,26 @@ return [
             'path' => env('IAM_UNIT_KERJA_PUSH_PATH', 'api/iam/push-unit-kerja'),
             'middleware' => env('IAM_UNIT_KERJA_PUSH_MIDDLEWARE', 'api') ? explode(',', env('IAM_UNIT_KERJA_PUSH_MIDDLEWARE', 'api')) : ['api'],
         ],
+        /*
+        |----------------------------------------------------------------------
+        | Delete Behavior
+        |----------------------------------------------------------------------
+        |
+        | 'soft' — deleted unit kerja stay trashed (soft delete)
+        | 'force' — deleted unit kerja force deleted (hard delete)
+        | Default: 'soft' (conservative: keep data recoverable)
+        |
+        */
+        'delete_soft' => env('IAM_UNIT_KERJA_DELETE_SOFT', false),
+        /*
+        |----------------------------------------------------------------------
+        | Pivot Delete Behavior
+        |----------------------------------------------------------------------
+        |
+        | user_unit_kerja pivot always force deletes (no soft delete on pivot).
+        | Controlled via IAM center when user or unit kerja is deleted.
+        |
+        */
     ],
 
     /*
