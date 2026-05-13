@@ -101,8 +101,9 @@ class VerifyIamToken
             }
 
             if ($refreshedToken) {
-                // Update session with new token and continue request
+                // Update session with new token
                 $request->session()->put('iam.access_token', $refreshedToken);
+
                 try {
                     $payload = \Juniyasyos\IamClient\Support\TokenValidator::decode($refreshedToken);
                     $request->session()->put('iam.payload', (array) $payload);
@@ -113,6 +114,25 @@ class VerifyIamToken
                         $request->session()->put('iam.sub', $sub);
                     } else {
                         throw new \Exception('Refreshed token missing required "sub" (subject) claim');
+                    }
+
+                    // Update token expiry/session metadata so EnforceSessionTimeout sees the refreshed token
+                    try {
+                        $expiryInfo = \Juniyasyos\IamClient\Support\TokenExpiryManager::extractExpiry($refreshedToken);
+                        if ($expiryInfo) {
+                            $request->session()->put('iam.token_exp_at', $expiryInfo['exp_at']);
+                            $request->session()->put('iam.token_expires_seconds', $expiryInfo['remaining_seconds']);
+                            $request->session()->put('iam.token_expires_minutes', $expiryInfo['remaining_minutes']);
+
+                            if (config('iam.sync_session_lifetime', true)) {
+                                $sessionLifetime = \Juniyasyos\IamClient\Support\TokenExpiryManager::calculateSessionLifetime($refreshedToken, (int) config('iam.session_lifetime_buffer', 2));
+                                if ($sessionLifetime) {
+                                    $request->session()->put('iam.session_lifetime', $sessionLifetime);
+                                }
+                            }
+                        }
+                    } catch (\Throwable $metaErr) {
+                        Log::debug('IamClient::VerifyIamToken - failed to update token expiry metadata after refresh', ['error' => $metaErr->getMessage()]);
                     }
 
                     Log::info('IamClient::VerifyIamToken - silent token refresh successful', [
@@ -157,37 +177,46 @@ class VerifyIamToken
 
         // Remote verification (serves on-server logout expiration/revoke)
         if (config('iam.verify_remote_each_request', true)) {
-            try {
-                $verifyResponse = Http::timeout(4)->post(IamConfig::verifyEndpoint(), [
-                    'token' => $accessToken,
-                    'include_user_data' => false,
-                ]);
+            // Cache remote verification per token to avoid remote call on every request.
+            $verifyCacheKey = 'iam:verify:token:' . sha1($accessToken);
+            $cachedOk = Cache::get($verifyCacheKey);
 
-                if (! $verifyResponse->successful()) {
-                    throw new \Exception('Remote verify returned non-200');
+            if ($cachedOk !== true) {
+                try {
+                    $verifyResponse = Http::timeout(4)->post(IamConfig::verifyEndpoint(), [
+                        'token' => $accessToken,
+                        'include_user_data' => false,
+                    ]);
+
+                    if (! $verifyResponse->successful()) {
+                        throw new \Exception('Remote verify returned non-200');
+                    }
+
+                    // Cache success briefly to reduce roundtrips. TTL configurable via env/config if needed.
+                    Cache::put($verifyCacheKey, true, config('iam.verify_cache_ttl', 60));
+                } catch (\Throwable $remoteException) {
+                    Log::warning('IamClient::VerifyIamToken - remote verify failure, clearing session', [
+                        'error' => $remoteException->getMessage(),
+                        'session_id' => $request->session()->getId(),
+                    ]);
+
+                    Auth::logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+                    $request->session()->forget('iam');
+
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json(['message' => 'Session invalidated by IAM, please login again.'], 401);
+                    }
+
+                    $loginRoute = IamConfig::loginRouteName(config('iam.guard', 'web'));
+
+                    if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
+                        return redirect()->route($loginRoute)->with('warning', 'Session invalidated by IAM, please login again.');
+                    }
+
+                    return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session invalidated by IAM, please login again.');
                 }
-            } catch (\Throwable $remoteException) {
-                Log::warning('IamClient::VerifyIamToken - remote verify failure, clearing session', [
-                    'error' => $remoteException->getMessage(),
-                    'session_id' => $request->session()->getId(),
-                ]);
-
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-                $request->session()->forget('iam');
-
-                if ($request->wantsJson() || $request->ajax()) {
-                    return response()->json(['message' => 'Session invalidated by IAM, please login again.'], 401);
-                }
-
-                $loginRoute = IamConfig::loginRouteName(config('iam.guard', 'web'));
-
-                if (\Illuminate\Support\Facades\Route::has($loginRoute)) {
-                    return redirect()->route($loginRoute)->with('warning', 'Session invalidated by IAM, please login again.');
-                }
-
-                return redirect()->to(config('iam.login_route', '/sso/login'))->with('warning', 'Session invalidated by IAM, please login again.');
             }
         }
 

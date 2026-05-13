@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Juniyasyos\IamClient\Support\IamConfig;
+use Illuminate\Support\Facades\Cache;
 
 class SyncUsersController extends Controller
 {
@@ -53,9 +54,14 @@ class SyncUsersController extends Controller
             ]);
         }
 
-        $users = $userModel::query()
-            ->get()
-            ->map(function ($user) use ($fields) {
+        // Prepare query and eager-load roles when available to avoid N+1
+        $userModelInstance = new $userModel();
+        $query = $userModel::query();
+        if (method_exists($userModelInstance, 'roles')) {
+            $query = $query->with('roles');
+        }
+
+        $users = $query->get()->map(function ($user) use ($fields) {
                 $item = [];
 
                 foreach ($fields as $column => $claim) {

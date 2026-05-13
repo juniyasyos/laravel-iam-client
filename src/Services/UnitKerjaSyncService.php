@@ -23,15 +23,33 @@ class UnitKerjaSyncService
         $unitRecordsBySlug = [];
         $syncedUnits = 0;
 
-        // Upsert active units
+        // Batch-fetch existing units by slug to avoid per-item queries (prevent N+1)
+        $slugs = array_values(array_filter(array_map(function ($it) {
+            return isset($it['slug']) ? trim($it['slug']) : null;
+        }, $units)));
+
+        $existingUnits = [];
+        if (!empty($slugs)) {
+            $existingUnits = $this->queryWithTrashed($unitModelClass)
+                ->whereIn('slug', $slugs)
+                ->get()
+                ->keyBy('slug')
+                ->toArray();
+        }
+
+        // Upsert active units using the pre-fetched map
         foreach ($units as $item) {
             if (! isset($item['slug']) || Str::of($item['slug'])->trim()->isEmpty()) {
                 continue;
             }
 
-            $unit = $this->queryWithTrashed($unitModelClass)
-                ->where('slug', $item['slug'])
-                ->first();
+            $slug = trim($item['slug']);
+
+            $unit = null;
+            if (isset($existingUnits[$slug])) {
+                // hydrate model instance from array data
+                $unit = $unitModelClass::withTrashed()->find($existingUnits[$slug]['id']);
+            }
 
             if ($unit) {
                 if ($this->isTrashed($unit)) {
@@ -45,7 +63,7 @@ class UnitKerjaSyncService
                 $unit->save();
             } else {
                 $unit = $unitModelClass::create([
-                    'slug' => $item['slug'],
+                    'slug' => $slug,
                     'unit_name' => $item['unit_name'] ?? null,
                     'description' => $item['description'] ?? null,
                 ]);
@@ -116,30 +134,29 @@ class UnitKerjaSyncService
 
         foreach ($userUnitRelations as $relation) {
             $unit = null;
-            $user = null;
+            $userId = null;
 
-            if (! empty($relation['unit_slug'])) {
-                $unit = $unitModelClass::where('slug', $relation['unit_slug'])->first();
+            // Resolve unit by slug from the newly created/updated map first
+            if (! empty($relation['unit_slug']) && isset($unitRecordsBySlug[$relation['unit_slug']])) {
+                $unit = $unitRecordsBySlug[$relation['unit_slug']];
             }
 
+            // fallback: try by ID
             if (! $unit && ! empty($relation['unit_kerja_id'])) {
                 $unit = $unitModelClass::find($relation['unit_kerja_id']);
             }
 
-            if (! $user && ! empty($relation['user_nip']) && ! empty($userIndexByNip[$relation['user_nip']])) {
-                $user = $userModelClass::find($userIndexByNip[$relation['user_nip']]);
+            // Resolve user id using already-built index maps (avoid extra queries)
+            if (! empty($relation['user_nip']) && ! empty($userIndexByNip[$relation['user_nip']])) {
+                $userId = $userIndexByNip[$relation['user_nip']];
+            } elseif (! empty($relation['user_email']) && ! empty($userIndexByEmail[$relation['user_email']])) {
+                $userId = $userIndexByEmail[$relation['user_email']];
+            } elseif (! empty($relation['user_id'])) {
+                $userId = $relation['user_id'];
             }
 
-            if (! $user && ! empty($relation['user_email']) && ! empty($userIndexByEmail[$relation['user_email']])) {
-                $user = $userModelClass::find($userIndexByEmail[$relation['user_email']]);
-            }
-
-            if (! $user && ! empty($relation['user_id'])) {
-                $user = $userModelClass::find($relation['user_id']);
-            }
-
-            if ($unit && $user) {
-                $relationsByUnitSlug[$unit->slug][] = $user->id;
+            if ($unit && $userId) {
+                $relationsByUnitSlug[$unit->slug][] = $userId;
             }
         }
 

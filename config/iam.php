@@ -408,7 +408,7 @@ return [
     | to ensure server-side session/token state has not been revoked or expired.
     |
     */
-    'verify_remote_each_request' => env('IAM_VERIFY_REMOTE_EACH_REQUEST', true),
+    'verify_remote_each_request' => env('IAM_VERIFY_REMOTE_EACH_REQUEST', false),
     /*
     |--------------------------------------------------------------------------
     | Auto‑attach verify middleware
