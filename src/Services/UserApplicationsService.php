@@ -67,13 +67,13 @@ class UserApplicationsService
     /**
      * Get detailed user applications with complete metadata.
      * 
-    * Returns comprehensive application information including:
-    * - All metadata from the standard IAM detail endpoint
-    * - Logo availability status
-    * - All URL types (primary, redirects, callback)
-    * - Timestamps (created_at, updated_at)
-    * - Access profiles that provide access to each app
-    * - User's access profiles list
+     * Returns comprehensive application information including:
+     * - All metadata from the standard IAM detail endpoint
+     * - Logo availability status
+     * - All URL types (primary, redirects, callback)
+     * - Timestamps (created_at, updated_at)
+     * - Access profiles that provide access to each app
+     * - User's access profiles list
      * 
      * @return array
      * 
@@ -106,7 +106,8 @@ class UserApplicationsService
      */
     public function getApplicationsDetail(): array
     {
-        $endpoint = IamConfig::userApplicationsDetailEndpoint();
+        $endpoint = IamConfig::backchannelUserApplicationsEndpoint()
+            ?? IamConfig::userApplicationsDetailEndpoint();
 
         return $this->fetchFromIam($endpoint, 'applicationsDetail');
     }

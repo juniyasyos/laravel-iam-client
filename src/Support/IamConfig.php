@@ -107,7 +107,6 @@ class IamConfig
 
     public static function backchannelUserApplicationsEndpoint(): ?string
     {
-        // Deprecated: switcher reads now always use the standard IAM detail endpoint.
         $explicit = (string) config('iam.backchannel_user_applications_endpoint');
 
         return $explicit !== '' ? $explicit : null;
