@@ -77,28 +77,28 @@ class IamUserProvisioner
             ]);
         }
 
-        $unitKerjaValues = $this->resolveUnitKerjaValues($payload);
+        $unitKerjaItems = $this->resolveUnitKerjaItems($payload);
 
-        if (config('iam.require_unit_kerja', false) && count($unitKerjaValues) === 0) {
+        if (config('iam.require_unit_kerja', false) && count($unitKerjaItems) === 0) {
             throw new IamAuthenticationException(
                 sprintf('Unable to provision SSO user: missing required unit kerja claim [%s].', config('iam.unit_kerja_field', 'unit_kerja'))
             );
         }
 
         $user = $this->syncUser($payload);
-        $this->syncUnitKerja($user, $unitKerjaValues);
+        $this->syncUnitKerja($user, $unitKerjaItems);
         $this->syncRoles($user, $payload);
 
         Log::info('User provisioned', [
             'user_id' => $user->getAuthIdentifier(),
             'email' => $user->email ?? null,
-            'unit_kerja' => $unitKerjaValues,
+            'unit_kerja' => $this->summarizeUnitKerjaItems($unitKerjaItems),
         ]);
 
         return [$user, $payload];
     }
 
-    protected function resolveUnitKerjaValues(array $payload): array
+    protected function resolveUnitKerjaItems(array $payload): array
     {
         $field = config('iam.unit_kerja_field', 'unit_kerja');
 
@@ -114,33 +114,89 @@ class IamUserProvisioner
             }
 
             // support comma-separated string, e.g. "unit1,unit2"
-            $values = array_filter(array_map('trim', explode(',', $raw)), fn($item) => $item !== '');
+            $values = array_filter(array_map(function ($item) {
+                $item = trim($item);
 
-            return array_values(array_unique($values));
+                return $item === '' ? null : ['unit_name' => $item];
+            }, explode(',', $raw)));
+
+            return array_values($values);
         }
 
         if (is_array($raw)) {
-            $values = array_filter(array_map(function ($item) {
-                if (is_string($item)) {
-                    return trim($item);
+            if (array_is_list($raw)) {
+                $items = $raw;
+            } else {
+                $items = [$raw];
+            }
+
+            $normalized = [];
+
+            foreach ($items as $item) {
+                $normalizedItem = $this->normalizeUnitKerjaItem($item);
+
+                if ($normalizedItem !== null) {
+                    $normalized[] = $normalizedItem;
                 }
+            }
 
-                return $item;
-            }, $raw), fn($item) => $item !== null && $item !== '');
-
-            return array_values(array_unique($values));
+            return $normalized;
         }
 
-        return [(string) $raw];
+        $rawValue = trim((string) $raw);
+
+        return $rawValue === '' ? [] : [['unit_name' => $rawValue]];
     }
 
-    protected function syncUnitKerja(Model $user, array $unitKerjaValues): void
+    protected function normalizeUnitKerjaItem(mixed $item): ?array
+    {
+        if (is_string($item)) {
+            $item = trim($item);
+
+            return $item === '' ? null : ['unit_name' => $item];
+        }
+
+        if (is_numeric($item)) {
+            return ['id' => (int) $item];
+        }
+
+        if (! is_array($item)) {
+            return null;
+        }
+
+        $id = data_get($item, 'id');
+        $slug = trim((string) data_get($item, 'slug', ''));
+        $unitName = trim((string) data_get($item, 'unit_name', data_get($item, 'name', '')));
+        $description = data_get($item, 'description');
+
+        $normalized = [];
+
+        if (is_numeric($id)) {
+            $normalized['id'] = (int) $id;
+        }
+
+        if ($slug !== '') {
+            $normalized['slug'] = $slug;
+        }
+
+        if ($unitName !== '') {
+            $normalized['unit_name'] = $unitName;
+        }
+
+        if ($description !== null || array_key_exists('description', $item)) {
+            $normalized['description'] = $description;
+        }
+
+        return empty($normalized) ? null : $normalized;
+    }
+
+    protected function syncUnitKerja(Model $user, array $unitKerjaItems): void
     {
         if (! config('iam.sync_unit_kerja', true)) {
             return;
         }
 
-        if (empty($unitKerjaValues)) {
+        if (empty($unitKerjaItems)) {
             return;
         }
 
@@ -158,12 +214,8 @@ class IamUserProvisioner
 
         $unitIds = [];
 
-        foreach ($unitKerjaValues as $unitValue) {
-            if (is_numeric($unitValue) && $unitKerjaModel::whereKey($unitValue)->exists()) {
-                $unit = $unitKerjaModel::find($unitValue);
-            } else {
-                $unit = $unitKerjaModel::firstOrCreate(['unit_name' => (string) $unitValue], ['description' => 'Synced from IAM provisioning']);
-            }
+        foreach ($unitKerjaItems as $unitKerjaItem) {
+            $unit = $this->resolveUnitKerjaRecord($unitKerjaModel, $unitKerjaItem, 'Synced from IAM provisioning');
 
             if ($unit) {
                 $unitIds[] = $unit->getKey();
@@ -172,8 +224,78 @@ class IamUserProvisioner
 
         if (! empty($unitIds)) {
             $user->unitKerjas()->sync(array_values(array_unique($unitIds)));
-            Log::info('User unit_kerja synced from IAM', ['user_id' => $user->getAuthIdentifier(), 'unit_kerja' => $unitKerjaValues]);
+            Log::info('User unit_kerja synced from IAM', ['user_id' => $user->getAuthIdentifier(), 'unit_kerja' => $this->summarizeUnitKerjaItems($unitKerjaItems)]);
         }
+    }
+
+    protected function resolveUnitKerjaRecord(string $unitKerjaModel, array $unitKerjaData, ?string $defaultDescription = null): ?object
+    {
+        $id = data_get($unitKerjaData, 'id');
+        $slug = trim((string) data_get($unitKerjaData, 'slug', ''));
+        $unitName = trim((string) data_get($unitKerjaData, 'unit_name', ''));
+        $description = array_key_exists('description', $unitKerjaData)
+            ? data_get($unitKerjaData, 'description')
+            : $defaultDescription;
+
+        $unit = null;
+
+        if (is_numeric($id)) {
+            $unit = $unitKerjaModel::withTrashed()->find($id);
+        }
+
+        if (! $unit && $slug !== '') {
+            $unit = $unitKerjaModel::withTrashed()->firstOrNew(['slug' => $slug]);
+        }
+
+        if (! $unit && $unitName !== '') {
+            $unit = $unitKerjaModel::withTrashed()->firstOrNew(['unit_name' => $unitName]);
+        }
+
+        if (! $unit) {
+            return null;
+        }
+
+        $wasTrashed = method_exists($unit, 'trashed') && $unit->trashed();
+        $shouldSave = ! $unit->exists || $wasTrashed;
+
+        $attributes = [];
+
+        if ($unitName !== '') {
+            $attributes['unit_name'] = $unitName;
+        } elseif (! $unit->exists && $slug !== '') {
+            $attributes['unit_name'] = Str::of($slug)->replace(['-', '_'], ' ')->title()->toString();
+        }
+
+        if ($slug !== '') {
+            $attributes['slug'] = $slug;
+        }
+
+        if ($description !== null || array_key_exists('description', $unitKerjaData)) {
+            $attributes['description'] = $description;
+        }
+
+        if (! empty($attributes)) {
+            $unit->fill($attributes);
+            $shouldSave = true;
+        }
+
+        if ($wasTrashed) {
+            $unit->restore();
+            $shouldSave = true;
+        }
+
+        if ($shouldSave) {
+            $unit->save();
+        }
+
+        return $unit;
+    }
+
+    protected function summarizeUnitKerjaItems(array $unitKerjaItems): array
+    {
+        return array_values(array_filter(array_map(function (array $item) {
+            return $item['unit_name'] ?? $item['slug'] ?? ($item['id'] ?? null);
+        }, $unitKerjaItems)));
     }
 
     protected function syncUser(array $payload): Model

@@ -106,8 +106,7 @@ class UserApplicationsService
      */
     public function getApplicationsDetail(): array
     {
-        $endpoint = IamConfig::backchannelUserApplicationsEndpoint()
-            ?? IamConfig::userApplicationsDetailEndpoint();
+        $endpoint = IamConfig::userApplicationsDetailEndpoint();
 
         return $this->fetchFromIam($endpoint, 'applicationsDetail');
     }
