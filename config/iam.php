@@ -109,8 +109,9 @@ return [
     | Backchannel user applications endpoint
     |--------------------------------------------------------------------------
     |
-    | Optional internal endpoint for retrieving application metadata from
-    | IAM via a more secure or optimized backchannel route.
+    | Deprecated for switcher reads. Application switchers should use the
+    | standard IAM detail endpoint so browser-accessible URLs remain the
+    | source of truth. Kept only for backward compatibility with older setups.
     |
     */
     'backchannel_user_applications_endpoint' => env('IAM_BACKCHANNEL_USER_APPLICATIONS_ENDPOINT', null),

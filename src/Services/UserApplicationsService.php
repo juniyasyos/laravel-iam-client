@@ -67,13 +67,13 @@ class UserApplicationsService
     /**
      * Get detailed user applications with complete metadata.
      * 
-     * Returns comprehensive application information including:
-     * - All metadata from basic endpoint
-     * - Logo availability status
-     * - All URL types (primary, redirects, callback, backchannel)
-     * - Timestamps (created_at, updated_at)
-     * - Access profiles that provide access to each app
-     * - User's access profiles list
+    * Returns comprehensive application information including:
+    * - All metadata from the standard IAM detail endpoint
+    * - Logo availability status
+    * - All URL types (primary, redirects, callback)
+    * - Timestamps (created_at, updated_at)
+    * - Access profiles that provide access to each app
+    * - User's access profiles list
      * 
      * @return array
      * 
