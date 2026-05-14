@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PushUsersController extends Controller
 {
@@ -416,7 +417,13 @@ class PushUsersController extends Controller
 
         $unit = null;
 
-        if (is_numeric($id)) {
+        // Prefer existing record by slug to avoid creating/updating a different
+        // record and causing unique-slug constraint violations.
+        if ($slug !== '') {
+            $unit = $unitKerjaModel::withTrashed()->where('slug', $slug)->first();
+        }
+
+        if (! $unit && is_numeric($id)) {
             $unit = $unitKerjaModel::withTrashed()->find($id);
         }
 
