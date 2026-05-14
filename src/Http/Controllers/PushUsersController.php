@@ -185,7 +185,7 @@ class PushUsersController extends Controller
                 }
             }
 
-            $this->syncUnitKerja($existingUser, data_get($item, 'unit_kerja', []));
+                $this->syncUnitKerja($existingUser, data_get($item, 'unit_kerja', null));
         }
 
         $deleted = 0;
@@ -237,8 +237,24 @@ class PushUsersController extends Controller
             return;
         }
 
+        // If the payload did not include `unit_kerja` (raw is null), skip.
+        // If the payload included an empty array, we should detach all relations.
+        if ($rawUnitKerja === null) {
+            return;
+        }
+
         $unitKerjaItems = $this->normalizeUnitKerjaItems($rawUnitKerja);
+
+        // If unit_kerja was provided but normalized to empty, detach all.
         if (empty($unitKerjaItems)) {
+            if (method_exists($user, 'unitKerjas')) {
+                $user->unitKerjas()->sync([]);
+
+                Log::info('iam.client.user_unit_kerja_detached_from_push', [
+                    'user_id' => $user->getKey(),
+                ]);
+            }
+
             return;
         }
 
