@@ -106,10 +106,24 @@ class UserApplicationsService
      */
     public function getApplicationsDetail(): array
     {
-        $endpoint = IamConfig::backchannelUserApplicationsEndpoint()
-            ?? IamConfig::userApplicationsDetailEndpoint();
+        $backchannelEndpoint = IamConfig::backchannelUserApplicationsEndpoint();
+        $detailEndpoint = IamConfig::userApplicationsDetailEndpoint();
 
-        return $this->fetchFromIam($endpoint, 'applicationsDetail');
+        if (!empty($backchannelEndpoint)) {
+            $backchannelResult = $this->fetchFromIam($backchannelEndpoint, 'applicationsDetail:backchannel');
+
+            if ($this->hasApplicationsPayload($backchannelResult)) {
+                return $backchannelResult;
+            }
+
+            Log::warning('UserApplicationsService: Backchannel detail payload missing applications, falling back to IAM detail endpoint', [
+                'backchannel_endpoint' => $backchannelEndpoint,
+                'fallback_endpoint' => $detailEndpoint,
+                'response_keys' => array_keys($backchannelResult),
+            ]);
+        }
+
+        return $this->fetchFromIam($detailEndpoint, 'applicationsDetail');
     }
 
     /**
@@ -382,6 +396,14 @@ class UserApplicationsService
     }
 
     /**
+     * Ensure payload has the expected applications list contract.
+     */
+    private function hasApplicationsPayload(array $payload): bool
+    {
+        return array_key_exists('applications', $payload) && is_array($payload['applications']);
+    }
+
+    /**
      * Generate cache key for user-level application cache.
      * 
      * @param mixed $userId User ID
@@ -407,8 +429,7 @@ class UserApplicationsService
             return;
         }
 
-        // Clear both endpoints cache
-        $endpoints = ['/users/applications', '/users/applications/detail'];
+        $endpoints = self::applicationsCacheEndpoints();
         foreach ($endpoints as $endpoint) {
             $cacheKey = "iam:apps:user:{$userId}:" . md5($endpoint);
             Cache::forget($cacheKey);
@@ -428,7 +449,7 @@ class UserApplicationsService
     public static function clearSessionAppCache(): void
     {
         $sessionId = session()->getId();
-        $endpoints = ['/users/applications', '/users/applications/detail'];
+        $endpoints = self::applicationsCacheEndpoints();
 
         foreach ($endpoints as $endpoint) {
             $sessionCacheKey = "iam:apps:session:{$sessionId}:" . md5($endpoint);
@@ -438,6 +459,22 @@ class UserApplicationsService
         Log::debug("UserApplicationsService: Session application cache cleared", [
             'session_id' => $sessionId,
         ]);
+    }
+
+    /**
+     * Enumerate all possible endpoint strings used for applications caching.
+     *
+     * @return array<int, string>
+     */
+    private static function applicationsCacheEndpoints(): array
+    {
+        return array_values(array_unique(array_filter([
+            '/users/applications',
+            '/users/applications/detail',
+            IamConfig::userApplicationsEndpoint(),
+            IamConfig::userApplicationsDetailEndpoint(),
+            IamConfig::backchannelUserApplicationsEndpoint(),
+        ], fn($endpoint) => is_string($endpoint) && trim($endpoint) !== '')));
     }
 
 
