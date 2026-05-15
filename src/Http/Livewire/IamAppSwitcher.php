@@ -35,7 +35,10 @@ class IamAppSwitcher extends Component
 
     private function getCacheKey(): string
     {
-        return 'iam.apps.user.' . Auth::id();
+        return 'iam.apps.user.'
+            . Auth::id()
+            . ':' . session()->getId()
+            . ':' . sha1((string) (session('iam.access_token') ?? session('iam.access_token_backup') ?? ''));
     }
 
     public function loadApplications(): void
